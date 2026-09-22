@@ -24,6 +24,7 @@ const PoligonoGame = (() => {
   let cross = { x: 0.5, y: 0.45 };
   let recoil = { x: 0, y: 0 };
   let shake = 0;
+  let muzzleFlash = 0;
   let targets = [];
   let particles = [];
   let markers = [];
@@ -79,6 +80,7 @@ const PoligonoGame = (() => {
     spawnTimer = 0.4;
     recoil = { x: 0, y: 0 };
     shake = 0;
+    muzzleFlash = 0;
     cross = { x: 0.5, y: 0.45 };
   }
 
@@ -175,17 +177,19 @@ const PoligonoGame = (() => {
   }
 
   function update(dt) {
-    // aim lag for precision feel
+    // aim lag — snappy lerp (tracks finger tightly, slight precision feel)
     const aim = PoligonoInput.getAim();
-    const lag = PoligonoInput.prefersReducedMotion() ? 1 : 0.22;
-    cross.x += (aim.x - cross.x) * Math.min(1, lag + dt * 8);
-    cross.y += (aim.y - cross.y) * Math.min(1, lag + dt * 8);
+    const prefersReducedMotion = PoligonoInput.prefersReducedMotion();
+    const k = prefersReducedMotion ? 1 : (1 - Math.exp(-dt * 22));
+    cross.x += (aim.x - cross.x) * k;
+    cross.y += (aim.y - cross.y) * k;
 
     recoil.x *= Math.pow(0.01, dt);
     recoil.y *= Math.pow(0.01, dt);
     if (Math.abs(recoil.x) < 0.0001) recoil.x = 0;
     if (Math.abs(recoil.y) < 0.0001) recoil.y = 0;
     shake = Math.max(0, shake - dt * 4);
+    muzzleFlash = Math.max(0, muzzleFlash - dt * 8);
 
     if (mode === 'desafio' && !state.ended) {
       state.timeLeft -= dt;
@@ -255,6 +259,7 @@ const PoligonoGame = (() => {
     recoil.x += (Math.random() * 0.02 - 0.01);
     recoil.y -= 0.018 + Math.random() * 0.01;
     if (!PoligonoInput.prefersReducedMotion()) shake = 0.35;
+    muzzleFlash = 1;
 
     // hit test front-to-back (near lanes first)
     const sorted = targets.slice().filter(t => !t.hit).sort((a, b) => b.lane - a.lane);
@@ -289,7 +294,17 @@ const PoligonoGame = (() => {
       PoligonoAudio.hit(zone.name);
       if (state.combo > 1 && state.combo % 3 === 0) PoligonoAudio.combo(state.combo);
 
-      markers.push({ x: hitT.x, y: hitT.y, life: 0.45, text: zone.name === 'centro' ? 'CENTRO' : (zone.name === 'anel' ? 'ANEL' : 'BORDA'), pts });
+      markers.push({
+        x: hitT.x, y: hitT.y, life: 0.55,
+        text: zone.name === 'centro' ? 'CENTRO' : (zone.name === 'anel' ? 'ANEL' : 'BORDA'),
+        pts, size: zone.name === 'centro' ? 12 : 9
+      });
+      if (state.combo > 1 && state.combo % 3 === 0) {
+        markers.push({
+          x: cx, y: cy - 0.04, life: 0.7,
+          text: 'COMBO ×' + state.combo, pts: 0, toast: true
+        });
+      }
       burst(hitT.x * w, hitT.y * h, hitT.kind === 'steel' ? '#c0c8d0' : '#c4893a');
 
       if (mode === 'desafio' && state.score >= state.goal) {
@@ -361,21 +376,35 @@ const PoligonoGame = (() => {
     }
 
     for (const m of markers) {
-      g.globalAlpha = Math.min(1, m.life * 3);
+      const fade = Math.min(1, m.life * 2.8);
+      g.globalAlpha = fade;
+      g.textAlign = 'center';
+      if (m.toast) {
+        g.fillStyle = '#e8b86a';
+        g.font = 'bold 13px system-ui, sans-serif';
+        g.fillText(m.text, m.x * w, m.y * h);
+        g.globalAlpha = 1;
+        continue;
+      }
       g.fillStyle = m.miss ? '#a84838' : '#e8b86a';
       g.font = 'bold 14px system-ui, sans-serif';
-      g.textAlign = 'center';
-      g.fillText(m.text, m.x * w, m.y * h - 18);
+      g.fillText(m.text, m.x * w, m.y * h - 20);
       if (m.pts) {
         g.font = '12px system-ui, sans-serif';
-        g.fillText('+' + m.pts, m.x * w, m.y * h - 4);
+        g.fillText('+' + m.pts, m.x * w, m.y * h - 5);
       }
       if (!m.miss) {
-        // hit X marker
-        g.strokeStyle = '#e8b86a';
-        g.lineWidth = 2;
-        const s = 8;
+        // stronger hit X marker
+        const s = m.size || 10;
         const mx = m.x * w, my = m.y * h;
+        g.strokeStyle = 'rgba(20,16,12,0.85)';
+        g.lineWidth = 3.5;
+        g.beginPath();
+        g.moveTo(mx - s, my - s); g.lineTo(mx + s, my + s);
+        g.moveTo(mx + s, my - s); g.lineTo(mx - s, my + s);
+        g.stroke();
+        g.strokeStyle = '#e8b86a';
+        g.lineWidth = 2.2;
         g.beginPath();
         g.moveTo(mx - s, my - s); g.lineTo(mx + s, my + s);
         g.moveTo(mx + s, my - s); g.lineTo(mx - s, my + s);
@@ -503,13 +532,6 @@ const PoligonoGame = (() => {
       g.stroke();
     }
 
-    if (t.moving) {
-      g.fillStyle = 'rgba(232,184,106,0.35)';
-      g.font = '10px system-ui';
-      g.textAlign = 'center';
-      g.fillText('→', x, y + r + 12);
-    }
-
     g.restore();
   }
 
@@ -517,7 +539,33 @@ const PoligonoGame = (() => {
     const cx = (cross.x + recoil.x) * w;
     const cy = (cross.y + recoil.y) * h;
     const s = 14;
-    g.strokeStyle = 'rgba(232,184,106,0.9)';
+
+    // muzzle flash ring (brief, serious)
+    if (muzzleFlash > 0 && !PoligonoInput.prefersReducedMotion()) {
+      const a = Math.min(1, muzzleFlash);
+      g.strokeStyle = 'rgba(232,184,106,' + (0.55 * a) + ')';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(cx, cy, 10 + (1 - a) * 18, 0, Math.PI * 2);
+      g.stroke();
+      g.strokeStyle = 'rgba(255,240,200,' + (0.25 * a) + ')';
+      g.lineWidth = 1;
+      g.beginPath();
+      g.arc(cx, cy, 6 + (1 - a) * 10, 0, Math.PI * 2);
+      g.stroke();
+    }
+
+    // dark outline for contrast on light paper targets
+    g.strokeStyle = 'rgba(12,10,8,0.75)';
+    g.lineWidth = 3.2;
+    g.beginPath();
+    g.moveTo(cx - s, cy); g.lineTo(cx - 4, cy);
+    g.moveTo(cx + 4, cy); g.lineTo(cx + s, cy);
+    g.moveTo(cx, cy - s); g.lineTo(cx, cy - 4);
+    g.moveTo(cx, cy + 4); g.lineTo(cx, cy + s);
+    g.stroke();
+
+    g.strokeStyle = 'rgba(232,184,106,0.95)';
     g.lineWidth = 1.5;
     g.beginPath();
     g.moveTo(cx - s, cy); g.lineTo(cx - 4, cy);
@@ -525,12 +573,23 @@ const PoligonoGame = (() => {
     g.moveTo(cx, cy - s); g.lineTo(cx, cy - 4);
     g.moveTo(cx, cy + 4); g.lineTo(cx, cy + s);
     g.stroke();
+
+    g.fillStyle = 'rgba(12,10,8,0.7)';
+    g.beginPath();
+    g.arc(cx, cy, 2.4, 0, Math.PI * 2);
+    g.fill();
     g.fillStyle = 'rgba(232,184,106,0.95)';
     g.beginPath();
     g.arc(cx, cy, 1.5, 0, Math.PI * 2);
     g.fill();
+
     // outer ring
-    g.strokeStyle = 'rgba(196,137,58,0.35)';
+    g.strokeStyle = 'rgba(12,10,8,0.4)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(cx, cy, 22, 0, Math.PI * 2);
+    g.stroke();
+    g.strokeStyle = 'rgba(196,137,58,0.4)';
     g.lineWidth = 1;
     g.beginPath();
     g.arc(cx, cy, 22, 0, Math.PI * 2);
