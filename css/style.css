@@ -302,9 +302,15 @@ html, body {
   margin-top: 2px;
 }
 
+/* Desktop mouse: hide FOGO. Touch / híbrido: body.touch-ui força o botão. */
+body.desktop-aim .fire-zone { display: none !important; }
+body.desktop-aim #game { cursor: crosshair; }
+body.touch-ui .fire-zone:not(.hidden) { display: block !important; }
+body.touch-ui #game { cursor: none; }
+
 @media (hover: hover) and (pointer: fine) {
-  .fire-zone { display: none !important; }
-  #game { cursor: crosshair; }
+  body:not(.touch-ui) .fire-zone { display: none !important; }
+  body:not(.touch-ui) #game { cursor: crosshair; }
 }
 
 @media (prefers-reduced-motion: reduce) {
