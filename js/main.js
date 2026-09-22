@@ -83,8 +83,11 @@
   document.getElementById('btn-again').addEventListener('click', () => startMode(lastMode));
   document.getElementById('btn-results-menu').addEventListener('click', toMenu);
 
-  // long-press end treino via pause menu only; desafio ends on timer/goal
-  // Optional: double-tap pause then menu for treino end — covered by Reiniciar/Menu
+  document.getElementById('btn-end-session').addEventListener('click', () => {
+    PoligonoUI.hidePause();
+    PoligonoAudio.ui();
+    PoligonoGame.endSession();
+  });
 
   PoligonoUI.syncMuteLabels();
   PoligonoUI.showMenu();
