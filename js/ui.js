@@ -84,11 +84,28 @@ const PoligonoUI = (() => {
   }
 
   function updateHud(state, mode) {
-    $('hud-score').textContent = String(state.score);
+    const scoreEl = $('hud-score');
+    const goalEl = $('hud-goal');
+    scoreEl.textContent = String(state.score);
+    if (mode === 'desafio' && state.goal > 0) {
+      if (goalEl) {
+        goalEl.textContent = state.score + '/' + state.goal;
+        goalEl.classList.remove('hidden');
+      }
+    } else if (goalEl) {
+      goalEl.classList.add('hidden');
+    }
     const acc = state.shots ? Math.round((state.hits / state.shots) * 100) + '%' : '—';
     $('hud-acc').textContent = acc;
-    const mult = state.multiplier > 1 ? ('×' + state.multiplier.toFixed(1).replace(/\.0$/, '')) : ('×' + Math.max(1, state.combo || 1));
-    $('hud-combo').textContent = state.combo > 0 ? ('×' + state.combo) : '×1';
+
+    // combo streak clearly; multiplier subtle when >1
+    const streak = Math.max(0, state.combo || 0);
+    let comboText = String(streak);
+    if (state.multiplier > 1) {
+      const m = state.multiplier.toFixed(1).replace(/\.0$/, '');
+      comboText = streak + ' · ×' + m;
+    }
+    $('hud-combo').textContent = comboText;
     if (state.combo >= 3) $('hud-combo').style.color = '#e8b86a';
     else $('hud-combo').style.color = '';
 
