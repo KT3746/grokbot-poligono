@@ -22,7 +22,7 @@ Som (mudo) e a dica de primeira vez ficam salvos no aparelho (`localStorage`).
 
 ## Modos
 
-- **Treino** — sem cronômetro; foque em precisão e combo.
+- **Treino** — sem cronômetro; foque em precisão e combo. Use **Encerrar** no menu de pausa para terminar a sessão e ver o resultado.
 - **Desafio** — 60 segundos, ondas com mais alvos móveis, meta de 1200 pontos.
 
 ## Técnico
