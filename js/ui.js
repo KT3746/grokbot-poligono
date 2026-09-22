@@ -56,13 +56,33 @@ const PoligonoUI = (() => {
     hide('screen-pause');
   }
 
+  function wantsFireButton() {
+    const mq = window.matchMedia ? window.matchMedia.bind(window) : null;
+    const coarse = mq ? mq('(pointer: coarse)').matches : false;
+    const fine = mq ? mq('(pointer: fine)').matches : true;
+    const hover = mq ? mq('(hover: hover)').matches : true;
+    const touchPts = (navigator.maxTouchPoints || 0);
+    const narrow = Math.min(window.innerWidth, window.innerHeight) <= 820;
+    // Mobile-first: show FOGO unless clearly mouse-only desktop
+    if (coarse || touchPts > 0) return true;
+    if (narrow && ('ontouchstart' in window)) return true;
+    if (fine && hover && touchPts === 0 && !('ontouchstart' in window)) return false;
+    // Ambiguous (emulators / hybrids): prefer FOGO — Thomas joga no celular
+    return true;
+  }
+
+  function applyFireButton() {
+    const want = wantsFireButton();
+    document.body.classList.toggle('touch-ui', want);
+    document.body.classList.toggle('desktop-aim', !want);
+    if (want) show('fire-zone');
+    else hide('fire-zone');
+  }
+
   function showPlaying() {
     hideAllScreens();
     show('hud');
-    // fire button for coarse pointers
-    const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    if (coarse || ('ontouchstart' in window)) show('fire-zone');
-    else hide('fire-zone');
+    applyFireButton();
   }
 
   function showResults(state, mode) {
@@ -140,6 +160,6 @@ const PoligonoUI = (() => {
   return {
     show, hide, showMenu, showTip, tipSeen, showMode,
     showPause, hidePause, showPlaying, showResults,
-    updateHud, syncMuteLabels, toggleMute
+    updateHud, syncMuteLabels, toggleMute, applyFireButton, wantsFireButton
   };
 })();
