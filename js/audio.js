@@ -68,9 +68,11 @@ const PoligonoAudio = (() => {
   }
 
   function shot() {
-    noiseBurst(0.12, 0.32, 280);
-    tone(90, 0.18, 'sawtooth', 0.28, 40);
-    tone(55, 0.28, 'sine', 0.18, 28);
+    noiseBurst(0.14, 0.38, 220);
+    noiseBurst(0.06, 0.18, 900);
+    tone(85, 0.2, 'sawtooth', 0.32, 36);
+    tone(48, 0.34, 'sine', 0.22, 24);
+    tone(120, 0.08, 'square', 0.08, 70);
   }
 
   function hit(zone) {
