@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0a0908" />
+  <meta name="description" content="POLÍGONO — estande de tiro ao alvo premium. Precisão, calibre e concentração." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>POLÍGONO</title>
+  <link rel="stylesheet" href="css/style.css?v=202609221628" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230a0908'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23c4893a' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%23c4893a' stroke-width='1.5' opacity='0.7'/%3E%3Ccircle cx='32' cy='32' r='6' fill='none' stroke='%23e8b86a' stroke-width='1.5'/%3E%3Ccircle cx='32' cy='32' r='2' fill='%23e8b86a'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game" aria-label="Área do estande POLÍGONO"></canvas>
+
+    <div id="hud" class="hud hidden" aria-live="polite">
+      <div class="hud-left">
+        <div class="hud-block">
+          <span class="hud-label">Pontos</span>
+          <span id="hud-score" class="hud-value">0</span>
+        </div>
+        <div class="hud-block">
+          <span class="hud-label">Precisão</span>
+          <span id="hud-acc" class="hud-value">—</span>
+        </div>
+        <div class="hud-block">
+          <span class="hud-label">Combo</span>
+          <span id="hud-combo" class="hud-value">×1</span>
+        </div>
+        <div class="hud-block" id="hud-time-wrap">
+          <span class="hud-label">Tempo</span>
+          <span id="hud-time" class="hud-value">—</span>
+        </div>
+      </div>
+      <div class="hud-right">
+        <button type="button" id="btn-mute" class="icon-btn" aria-label="Mudo" title="Mudo">SOM</button>
+        <button type="button" id="btn-pause" class="icon-btn" aria-label="Pausar" title="Pausar">II</button>
+      </div>
+    </div>
+
+    <div id="fire-zone" class="fire-zone hidden" aria-hidden="true">
+      <button type="button" id="btn-fire" class="fire-btn" aria-label="Disparar">FOGO</button>
+    </div>
+
+    <!-- Menu -->
+    <section id="screen-menu" class="overlay screen" aria-label="Menu">
+      <div class="panel">
+        <p class="eyebrow">estande indoor · precisão</p>
+        <h1 class="logo">POLÍGONO</h1>
+        <p class="tagline">Calibre a mira. Respire. Dispare.</p>
+        <p class="rule">Alvos estáticos e móveis · zonas centro / anel / borda</p>
+        <button type="button" id="btn-start" class="btn primary">Entrar no estande</button>
+        <button type="button" id="btn-mute-menu" class="btn ghost">Som: ligado</button>
+      </div>
+    </section>
+
+    <!-- Tip primeira vez -->
+    <section id="screen-tip" class="overlay screen hidden" aria-label="Dica">
+      <div class="panel tip-panel">
+        <h2>Como jogar</h2>
+        <ul class="tips">
+          <li><strong>Celular:</strong> arraste um dedo para mirar; toque em <strong>FOGO</strong> para disparar.</li>
+          <li><strong>PC:</strong> mova o mouse para mirar; clique ou Espaço para disparar.</li>
+          <li>Acerte o <span class="c-amber">centro</span> para mais pontos e combo.</li>
+          <li>Esc / II pausa. Som fica salvo no aparelho.</li>
+        </ul>
+        <button type="button" id="btn-tip-ok" class="btn primary">Entendi</button>
+      </div>
+    </section>
+
+    <!-- Seleção de modo -->
+    <section id="screen-mode" class="overlay screen hidden" aria-label="Modos">
+      <div class="panel">
+        <h2>Modo</h2>
+        <button type="button" id="btn-mode-treino" class="btn primary mode-btn">
+          <span class="mode-title">Treino</span>
+          <span class="mode-desc">Prática sem tempo · foque na precisão</span>
+        </button>
+        <button type="button" id="btn-mode-desafio" class="btn mode-btn">
+          <span class="mode-title">Desafio</span>
+          <span class="mode-desc">Ondas cronometradas · meta de pontos</span>
+        </button>
+        <button type="button" id="btn-mode-back" class="btn ghost">Voltar</button>
+      </div>
+    </section>
+
+    <!-- Pausa -->
+    <section id="screen-pause" class="overlay screen hidden" aria-label="Pausa">
+      <div class="panel">
+        <h2>Pausado</h2>
+        <button type="button" id="btn-resume" class="btn primary">Continuar</button>
+        <button type="button" id="btn-restart" class="btn">Reiniciar</button>
+        <button type="button" id="btn-menu" class="btn ghost">Menu</button>
+      </div>
+    </section>
+
+    <!-- Resultados -->
+    <section id="screen-results" class="overlay screen hidden" aria-label="Resultados">
+      <div class="panel">
+        <p class="eyebrow" id="results-eyebrow">sessão encerrada</p>
+        <h2 id="results-title">Resultado</h2>
+        <div class="results-grid">
+          <div><span class="hud-label">Pontos</span><span id="res-score" class="hud-value">0</span></div>
+          <div><span class="hud-label">Precisão</span><span id="res-acc" class="hud-value">0%</span></div>
+          <div><span class="hud-label">Melhor combo</span><span id="res-combo" class="hud-value">×1</span></div>
+          <div><span class="hud-label">Tiros</span><span id="res-shots" class="hud-value">0</span></div>
+        </div>
+        <button type="button" id="btn-again" class="btn primary">De novo</button>
+        <button type="button" id="btn-results-menu" class="btn ghost">Menu</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/audio.js?v=202609221628"></script>
+  <script src="js/input.js?v=202609221628"></script>
+  <script src="js/game.js?v=202609221628"></script>
+  <script src="js/ui.js?v=202609221628"></script>
+  <script src="js/main.js?v=202609221628"></script>
+</body>
+</html>
