@@ -98,4 +98,15 @@
     window.removeEventListener('pointerdown', unlock);
   };
   window.addEventListener('pointerdown', unlock, { once: true });
+
+  // Primeiro toque real força FOGO (emuladores / híbridos)
+  window.addEventListener('touchstart', () => {
+    document.body.classList.add('touch-ui');
+    document.body.classList.remove('desktop-aim');
+    if (PoligonoGame.isRunning()) PoligonoUI.applyFireButton();
+  }, { passive: true, once: true });
+
+  window.addEventListener('resize', () => {
+    if (PoligonoGame.isRunning()) PoligonoUI.applyFireButton();
+  });
 })();
