@@ -32,6 +32,14 @@ const PoligonoInput = (() => {
 
     canvas.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'touch') {
+        document.body.classList.add('touch-ui');
+        document.body.classList.remove('desktop-aim');
+        if (typeof PoligonoUI !== 'undefined' && PoligonoUI.applyFireButton) {
+          try { PoligonoUI.applyFireButton(); } catch (_) {}
+        } else {
+          const fz = document.getElementById('fire-zone');
+          if (fz) fz.classList.remove('hidden');
+        }
         if (aimingTouchId === null) {
           aimingTouchId = e.pointerId;
           try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -41,7 +49,10 @@ const PoligonoInput = (() => {
         return;
       }
       setAimFromClient(e.clientX, e.clientY);
-      fireQueued = true;
+      // Com FOGO visível, clique no canvas só mira
+      if (!document.body.classList.contains('touch-ui')) {
+        fireQueued = true;
+      }
       e.preventDefault();
     }, { passive: false });
 
