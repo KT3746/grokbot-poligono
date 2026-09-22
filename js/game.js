@@ -133,7 +133,8 @@ const PoligonoGame = (() => {
   function spawnTarget(moving) {
     const lane = Math.floor(Math.random() * 3);
     const scale = laneScale(lane);
-    const radius = (28 + Math.random() * 18) * scale * (Math.min(w, h) / 400);
+    const base = Math.min(w, h) <= 500 ? 36 : 28;
+    const radius = (base + Math.random() * 18) * scale * (Math.min(w, h) / 400);
     const kind = Math.random() < 0.35 ? 'steel' : 'paper';
     const y = laneY(lane) + (Math.random() * 0.04 - 0.02);
     const x = 0.12 + Math.random() * 0.76;
