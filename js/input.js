@@ -43,7 +43,7 @@ const PoligonoInput = (() => {
       setAimFromClient(e.clientX, e.clientY);
       fireQueued = true;
       e.preventDefault();
-    });
+    }, { passive: false });
 
     canvas.addEventListener('pointerup', (e) => {
       if (e.pointerType === 'touch' && e.pointerId === aimingTouchId) {
@@ -62,7 +62,7 @@ const PoligonoInput = (() => {
         fireQueued = true;
         PoligonoAudio.ensure();
       };
-      fireBtn.addEventListener('pointerdown', fire);
+      fireBtn.addEventListener('pointerdown', fire, { passive: false });
       fireBtn.addEventListener('click', (e) => { e.preventDefault(); });
     }
 
