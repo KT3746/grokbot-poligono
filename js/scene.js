@@ -41,6 +41,14 @@ const PoligonoScene = (() => {
     reduceMotion = !!(opts.reduceMotion);
 
     try {
+      const probe = document.createElement('canvas');
+      const glOk = probe.getContext('webgl2') || probe.getContext('webgl');
+      if (!glOk) return false;
+    } catch (_) {
+      return false;
+    }
+
+    try {
       const mobile = isMobileView();
       const pr = Math.min(window.devicePixelRatio || 1, mobile ? 1.4 : 2);
       renderer = new THREE.WebGLRenderer({
@@ -56,6 +64,7 @@ const PoligonoScene = (() => {
       if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) {
         renderer.outputColorSpace = THREE.SRGBColorSpace;
       }
+      if ('useLegacyLights' in renderer) renderer.useLegacyLights = true;
       renderer.shadowMap.enabled = false;
     } catch (err) {
       console.warn('POLÍGONO: WebGL indisponível', err);
@@ -64,7 +73,7 @@ const PoligonoScene = (() => {
 
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0908);
-    scene.fog = new THREE.Fog(0x0c0a08, 7, 22);
+    scene.fog = new THREE.Fog(0x0c0a08, 11, 26);
 
     camera = new THREE.PerspectiveCamera(56, 1, 0.12, 40);
     camera.position.set(camBase.x, camBase.y, camBase.z);
@@ -120,12 +129,12 @@ const PoligonoScene = (() => {
   }
 
   function buildTextures() {
-    const wallC = noiseCanvas(64, '#1a1612', ['#2a241c', '#0e0c0a', '#3a3228'], 280);
+    const wallC = noiseCanvas(64, '#2a241e', ['#3a3228', '#1a1612', '#4a4034'], 280);
     wallTex = texColorSpace(new THREE.CanvasTexture(wallC));
     wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
     wallTex.repeat.set(3, 2);
 
-    const floorC = noiseCanvas(64, '#14110e', ['#2c2418', '#0a0806', '#3a3020'], 320);
+    const floorC = noiseCanvas(64, '#221c16', ['#3a3024', '#14110e', '#4a3a28'], 320);
     const fg = floorC.getContext('2d');
     fg.globalAlpha = 0.35;
     fg.strokeStyle = '#8a5a2b';
@@ -236,72 +245,71 @@ const PoligonoScene = (() => {
     const wood = lambert(0x3a2a1c);
     const emit = new THREE.MeshBasicMaterial({ color: 0xe8c48a });
 
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(10, 0.18, 22), floorMat);
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.18, 22), floorMat);
     floor.position.set(0, -0.09, -8);
     scene.add(floor);
 
-    const ceil = new THREE.Mesh(new THREE.BoxGeometry(10, 0.16, 22), wallDark);
-    ceil.position.set(0, 4.05, -8);
+    const ceil = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.14, 22), wallDark);
+    ceil.position.set(0, 3.18, -8);
     scene.add(ceil);
 
-    const back = new THREE.Mesh(new THREE.BoxGeometry(10, 4.3, 0.35), rubber);
-    back.position.set(0, 2.05, -16.6);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(5.2, 3.4, 0.35), rubber);
+    back.position.set(0, 1.6, -16.6);
     scene.add(back);
 
-    const trap = new THREE.Mesh(new THREE.BoxGeometry(9.2, 2.4, 0.22), lambert(0x1a1210));
-    trap.position.set(0, 1.35, -16.35);
+    const trap = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.2, 0.22), lambert(0x2a1814));
+    trap.position.set(0, 1.25, -16.35);
     trap.rotation.x = -0.18;
     scene.add(trap);
 
-    const left = new THREE.Mesh(new THREE.BoxGeometry(0.28, 4.3, 22), wallMat);
-    left.position.set(-4.9, 2.05, -8);
+    const left = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.4, 22), wallMat);
+    left.position.set(-2.22, 1.6, -8);
     scene.add(left);
-    const right = new THREE.Mesh(new THREE.BoxGeometry(0.28, 4.3, 22), wallMat);
-    right.position.set(4.9, 2.05, -8);
+    const right = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.4, 22), wallMat);
+    right.position.set(2.22, 1.6, -8);
     scene.add(right);
 
-    const baffleGeo = new THREE.BoxGeometry(0.08, 1.6, 1.1);
-    const baffleMat = lambert(0x2a221c);
+    const baffleGeo = new THREE.BoxGeometry(0.07, 1.15, 0.85);
+    const baffleMat = lambert(0x3a3228);
     for (let i = 0; i < 5; i++) {
-      const z = -3.2 - i * 2.4;
+      const z = -3.0 - i * 2.3;
       const b1 = new THREE.Mesh(baffleGeo, baffleMat);
-      b1.position.set(-3.6, 2.7, z);
-      b1.rotation.y = 0.35;
+      b1.position.set(-1.72, 2.15, z);
+      b1.rotation.y = 0.28;
       scene.add(b1);
       const b2 = b1.clone();
-      b2.position.x = 3.6;
-      b2.rotation.y = -0.35;
+      b2.position.x = 1.72;
+      b2.rotation.y = -0.28;
       scene.add(b2);
     }
 
-    const railGeo = new THREE.BoxGeometry(8.4, 0.045, 0.045);
-    const railMat = metal;
+    const railGeo = new THREE.BoxGeometry(4.1, 0.04, 0.04);
     for (let i = 0; i < 3; i++) {
-      const rail = new THREE.Mesh(railGeo, railMat);
-      rail.position.set(0, 2.12, LANE_Z[i] - 0.12);
+      const rail = new THREE.Mesh(railGeo, metal);
+      rail.position.set(0, 2.02, LANE_Z[i] - 0.12);
       scene.add(rail);
     }
 
-    const tapeGeo = new THREE.BoxGeometry(0.045, 0.01, 18);
-    const tapeMat = lambert(0x8a5a2b);
-    for (const x of [-1.15, 0, 1.15]) {
+    const tapeGeo = new THREE.BoxGeometry(0.05, 0.012, 18);
+    const tapeMat = lambert(0xb07a38);
+    for (const x of [-0.72, 0, 0.72]) {
       const tape = new THREE.Mesh(tapeGeo, tapeMat);
-      tape.position.set(x, 0.01, -7.5);
+      tape.position.set(x, 0.012, -7.5);
       scene.add(tape);
     }
 
-    const markGeo = new THREE.BoxGeometry(3.4, 0.012, 0.06);
-    const markMat = lambert(0xc4893a, null, { color: 0x6a4a28 });
+    const markGeo = new THREE.BoxGeometry(2.2, 0.014, 0.07);
+    const markMat = lambert(0x8a5a2b);
     for (let i = 0; i < 3; i++) {
       const m = new THREE.Mesh(markGeo, markMat);
-      m.position.set(0, 0.012, LANE_Z[i] + 0.55);
+      m.position.set(0, 0.016, LANE_Z[i] + 0.55);
       scene.add(m);
     }
 
-    const stripGeo = new THREE.BoxGeometry(1.35, 0.04, 0.18);
+    const stripGeo = new THREE.BoxGeometry(1.55, 0.045, 0.16);
     for (let i = 0; i < 4; i++) {
       const s = new THREE.Mesh(stripGeo, emit);
-      s.position.set(-2.1 + (i % 2) * 4.2, 3.92, -2.2 - Math.floor(i / 2) * 6.2);
+      s.position.set(0, 3.08, -1.6 - i * 3.6);
       scene.add(s);
     }
 
@@ -314,21 +322,25 @@ const PoligonoScene = (() => {
   }
 
   function buildLights() {
-    hemi = new THREE.HemisphereLight(0x3a342c, 0x0a0806, 0.55);
+    hemi = new THREE.HemisphereLight(0x5a5044, 0x1a1410, 0.95);
     scene.add(hemi);
 
-    const ambient = new THREE.AmbientLight(0x2a241c, 0.32);
+    const ambient = new THREE.AmbientLight(0x3a3228, 0.62);
     scene.add(ambient);
 
-    keySpot = new THREE.SpotLight(0xf0d0a0, 2.6, 24, 0.55, 0.55, 1.1);
-    keySpot.position.set(0.2, 3.85, 0.4);
-    keySpot.target.position.set(0, 1.1, -8);
+    const fillDir = new THREE.DirectionalLight(0xe8d4b0, 0.55);
+    fillDir.position.set(0.4, 2.4, 4.2);
+    scene.add(fillDir);
+
+    keySpot = new THREE.SpotLight(0xf0d0a0, 3.8, 26, 0.62, 0.45, 1);
+    keySpot.position.set(0, 3.0, 0.8);
+    keySpot.target.position.set(0, 1.15, -8);
     scene.add(keySpot);
     scene.add(keySpot.target);
 
-    fillSpot = new THREE.SpotLight(0xc8b090, 1.4, 20, 0.7, 0.7, 1.2);
-    fillSpot.position.set(-1.4, 3.7, -4.5);
-    fillSpot.target.position.set(0, 1.2, -11);
+    fillSpot = new THREE.SpotLight(0xd4c0a0, 2.4, 22, 0.75, 0.6, 1);
+    fillSpot.position.set(0, 2.95, -5.5);
+    fillSpot.target.position.set(0, 1.2, -12);
     scene.add(fillSpot);
     scene.add(fillSpot.target);
 
@@ -397,7 +409,7 @@ const PoligonoScene = (() => {
   function worldOf(t) {
     const lane = Math.max(0, Math.min(2, t.lane | 0));
     const z = LANE_Z[lane];
-    const half = 1.42 + (2 - lane) * 0.62;
+    const half = 0.92 + (2 - lane) * 0.28;
     const x = (t.x - 0.5) * 2 * half;
     const y = TARGET_Y;
     return { x, y, z, lane };
@@ -559,7 +571,7 @@ const PoligonoScene = (() => {
       camBase.y + sy + oy - fx.recoilY * 0.6,
       camBase.z + fx.muzzle * 0.04
     );
-    camera.lookAt(fx.recoilX * 0.8, TARGET_Y + 0.02 + fx.recoilY * 1.2, -9.5);
+    camera.lookAt(fx.recoilX * 0.8, TARGET_Y - 0.08 + fx.recoilY * 1.2, -9.2);
     if (muzzleLight) {
       muzzleLight.intensity = reduceMotion ? 0 : fx.muzzle * 3.2;
     }
@@ -574,7 +586,7 @@ const PoligonoScene = (() => {
     renderer.setPixelRatio(pr);
     renderer.setSize(w, h, false);
     camera.aspect = w / Math.max(1, h);
-    camera.fov = mobile ? 58 : 50;
+    camera.fov = mobile ? 62 : 52;
     camera.updateProjectionMatrix();
   }
 

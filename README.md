@@ -27,7 +27,7 @@ Som (mudo) e a dica de primeira vez ficam salvos no aparelho (`localStorage`).
 
 ## Técnico
 
-Site estático (HTML/CSS/JS vanilla). Visual do estande em **Three.js** (CDN jsDelivr `three.min.js`, fallback unpkg). Mira, marcadores e HUD em overlay 2D. Caminhos relativos para GitHub Pages em `/grokbot-poligono/`. Sem IPs licenciados.
+Site estático (HTML/CSS/JS vanilla). Visual do estande em **Three.js** (CDN jsDelivr `three.module.min.js` via import map, boot em módulo). Mira, marcadores e HUD em overlay 2D. Caminhos relativos para GitHub Pages em `/grokbot-poligono/`. Sem IPs licenciados.
 
 ## Licença
 
