@@ -63,6 +63,16 @@ html, body {
   cursor: none;
 }
 
+#fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 3;
+  pointer-events: none;
+}
+
 .hidden { display: none !important; }
 
 /* HUD */
