@@ -1,11 +1,12 @@
 /* POLÍGONO — core shooting range loop */
 const PoligonoGame = (() => {
-  let canvas, ctx;
+  let canvas, ctx, fxCanvas, fxCtx;
   let running = false;
   let paused = false;
   let mode = 'treino'; // treino | desafio
   let lastTs = 0;
   let w = 0, h = 0, dpr = 1;
+  let use3d = false;
 
   const state = {
     score: 0,
@@ -40,9 +41,16 @@ const PoligonoGame = (() => {
 
   function init(opts) {
     canvas = opts.canvas;
-    ctx = canvas.getContext('2d');
+    fxCanvas = opts.fxCanvas || null;
     onEnd = opts.onEnd || null;
     onHud = opts.onHud || null;
+    use3d = typeof PoligonoScene !== 'undefined' && PoligonoScene.isReady();
+    if (use3d && fxCanvas) {
+      fxCtx = fxCanvas.getContext('2d');
+    } else {
+      ctx = canvas.getContext('2d');
+      if (fxCanvas) fxCtx = fxCanvas.getContext('2d');
+    }
     resize();
     window.addEventListener('resize', resize);
   }
@@ -51,9 +59,19 @@ const PoligonoGame = (() => {
     dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     w = canvas.clientWidth || window.innerWidth;
     h = canvas.clientHeight || window.innerHeight;
-    canvas.width = Math.floor(w * dpr);
-    canvas.height = Math.floor(h * dpr);
-    if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (use3d) {
+      if (typeof PoligonoScene !== 'undefined') PoligonoScene.resize(w, h);
+    } else if (ctx) {
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    if (fxCanvas && fxCtx) {
+      const fdpr = Math.min(dpr, 2);
+      fxCanvas.width = Math.floor(w * fdpr);
+      fxCanvas.height = Math.floor(h * fdpr);
+      fxCtx.setTransform(fdpr, 0, 0, fdpr, 0, 0);
+    }
   }
 
   function resetStats(m) {
@@ -89,6 +107,7 @@ const PoligonoGame = (() => {
     running = true;
     paused = false;
     lastTs = 0;
+    if (use3d) PoligonoScene.setPlaying(true);
     spawnInitial();
     hud();
     requestAnimationFrame(frame);
@@ -97,6 +116,12 @@ const PoligonoGame = (() => {
   function stop() {
     running = false;
     paused = false;
+    if (use3d) {
+      PoligonoScene.setPlaying(false);
+      PoligonoScene.syncTargets([]);
+      PoligonoScene.setFx({ shake: 0, recoilX: 0, recoilY: 0, muzzle: 0 });
+    }
+    if (fxCtx) fxCtx.clearRect(0, 0, w, h);
   }
 
   function setPaused(p) {
@@ -121,7 +146,6 @@ const PoligonoGame = (() => {
   }
 
   function laneY(lane) {
-    // lanes 0 far .. 2 near — perspective depth
     const base = 0.22;
     return base + lane * 0.18;
   }
@@ -133,13 +157,16 @@ const PoligonoGame = (() => {
   function spawnTarget(moving) {
     const lane = Math.floor(Math.random() * 3);
     const scale = laneScale(lane);
-    const base = Math.min(w, h) <= 500 ? 36 : 28;
-    const radius = (base + Math.random() * 18) * scale * (Math.min(w, h) / 400);
+    const mobile = Math.min(w, h) <= 500;
+    const base = mobile ? 36 : 28;
+    const pixelR = (base + Math.random() * 18) * scale * (Math.min(w, h) / 400);
+    const sizeWorld = (mobile ? 0.52 : 0.44) * (1.16 - lane * 0.07);
     const kind = Math.random() < 0.35 ? 'steel' : 'paper';
     const y = laneY(lane) + (Math.random() * 0.04 - 0.02);
     const x = 0.12 + Math.random() * 0.76;
     const t = {
-      x, y, r: radius, lane, kind,
+      x, y, r: use3d ? sizeWorld : pixelR,
+      sizeWorld, pixelR, lane, kind,
       moving: !!moving,
       vx: moving ? (0.08 + Math.random() * 0.12) * (Math.random() < 0.5 ? -1 : 1) : 0,
       bounce: moving && Math.random() < 0.4,
@@ -148,11 +175,10 @@ const PoligonoGame = (() => {
       flash: 0,
       id: Math.random().toString(36).slice(2)
     };
-    // avoid stacking too close
     for (const o of targets) {
-      const dx = (o.x - t.x) * w;
-      const dy = (o.y - t.y) * h;
-      if (Math.hypot(dx, dy) < (o.r + t.r) * 1.4) {
+      const dx = (o.x - t.x);
+      const dy = (o.y - t.y);
+      if (Math.hypot(dx * w, dy * h) < ((o.pixelR || o.r) + (t.pixelR || t.r)) * 1.4) {
         t.x = 0.1 + Math.random() * 0.8;
       }
     }
@@ -178,7 +204,6 @@ const PoligonoGame = (() => {
   }
 
   function update(dt) {
-    // aim lag — snappy lerp (tracks finger tightly, slight precision feel)
     const aim = PoligonoInput.getAim();
     const prefersReducedMotion = PoligonoInput.prefersReducedMotion();
     const k = prefersReducedMotion ? 1 : (1 - Math.exp(-dt * 22));
@@ -237,12 +262,30 @@ const PoligonoGame = (() => {
 
     if (PoligonoInput.consumeFire()) fire();
 
-    // desafio wave bump
     if (mode === 'desafio' && state.score >= state.wave * 400) {
       state.wave++;
     }
 
     hud();
+  }
+
+  function screenOf(t) {
+    if (use3d) return PoligonoScene.project(t);
+    return { x: t.x, y: t.y };
+  }
+
+  function pick2d(px, py) {
+    const sorted = targets.slice().filter(t => !t.hit).sort((a, b) => b.lane - a.lane);
+    for (const t of sorted) {
+      const dx = px - t.x * w;
+      const dy = py - t.y * h;
+      const rad = t.pixelR || t.r;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= rad) {
+        return { target: t, distNorm: dist / rad };
+      }
+    }
+    return null;
   }
 
   function fire() {
@@ -256,29 +299,23 @@ const PoligonoGame = (() => {
     const px = cx * w;
     const py = cy * h;
 
-    // slight recoil kick
     recoil.x += (Math.random() * 0.02 - 0.01);
     recoil.y -= 0.018 + Math.random() * 0.01;
     if (!PoligonoInput.prefersReducedMotion()) shake = 0.35;
     muzzleFlash = 1;
 
-    // hit test front-to-back (near lanes first)
-    const sorted = targets.slice().filter(t => !t.hit).sort((a, b) => b.lane - a.lane);
+    const hitInfo = use3d
+      ? PoligonoScene.pick(cx, cy, targets)
+      : pick2d(px, py);
+
     let hitT = null;
     let zone = null;
     let distNorm = 1;
-
-    for (const t of sorted) {
-      const dx = px - t.x * w;
-      const dy = py - t.y * h;
-      const dist = Math.hypot(dx, dy);
-      if (dist <= t.r) {
-        hitT = t;
-        distNorm = dist / t.r;
-        for (const ring of RINGS) {
-          if (distNorm <= ring.r) { zone = ring; break; }
-        }
-        break;
+    if (hitInfo && hitInfo.target && hitInfo.distNorm <= 1) {
+      hitT = hitInfo.target;
+      distNorm = hitInfo.distNorm;
+      for (const ring of RINGS) {
+        if (distNorm <= ring.r) { zone = ring; break; }
       }
     }
 
@@ -295,8 +332,9 @@ const PoligonoGame = (() => {
       PoligonoAudio.hit(zone.name);
       if (state.combo > 1 && state.combo % 3 === 0) PoligonoAudio.combo(state.combo);
 
+      const scr = screenOf(hitT);
       markers.push({
-        x: hitT.x, y: hitT.y, life: 0.55,
+        x: scr.x, y: scr.y, life: 0.55,
         text: zone.name === 'centro' ? 'CENTRO' : (zone.name === 'anel' ? 'ANEL' : 'BORDA'),
         pts, size: zone.name === 'centro' ? 12 : 9
       });
@@ -306,7 +344,11 @@ const PoligonoGame = (() => {
           text: 'COMBO ×' + state.combo, pts: 0, toast: true
         });
       }
-      burst(hitT.x * w, hitT.y * h, hitT.kind === 'steel' ? '#c0c8d0' : '#c4893a');
+      if (use3d) {
+        PoligonoScene.burstAt(hitT, hitT.kind);
+      } else {
+        burst(hitT.x * w, hitT.y * h, hitT.kind === 'steel' ? '#c0c8d0' : '#c4893a');
+      }
 
       if (mode === 'desafio' && state.score >= state.goal) {
         finish(true);
@@ -316,6 +358,7 @@ const PoligonoGame = (() => {
       state.multiplier = 1;
       PoligonoAudio.miss();
       markers.push({ x: cx, y: cy, life: 0.3, text: '×', pts: 0, miss: true });
+      if (use3d) PoligonoScene.missAt(cx, cy);
     }
     hud();
   }
@@ -350,7 +393,18 @@ const PoligonoGame = (() => {
   }
 
   function draw() {
+    if (use3d) {
+      PoligonoScene.setReducedMotion(PoligonoInput.prefersReducedMotion());
+      PoligonoScene.setFx({
+        shake, recoilX: recoil.x, recoilY: recoil.y, muzzle: muzzleFlash
+      });
+      PoligonoScene.syncTargets(targets);
+      drawOverlay(fxCtx || ctx);
+      return;
+    }
+
     const g = ctx;
+    if (!g) return;
     g.clearRect(0, 0, w, h);
 
     let ox = 0, oy = 0;
@@ -363,10 +417,24 @@ const PoligonoGame = (() => {
 
     drawRange(g);
 
-    // targets back to front
     const sorted = targets.slice().sort((a, b) => a.lane - b.lane);
     for (const t of sorted) drawTarget(g, t);
 
+    drawParticles(g);
+    drawMarkers(g);
+    drawCrosshair(g);
+    g.restore();
+  }
+
+  function drawOverlay(g) {
+    if (!g) return;
+    g.clearRect(0, 0, w, h);
+    drawParticles(g);
+    drawMarkers(g);
+    if (running && !state.ended) drawCrosshair(g);
+  }
+
+  function drawParticles(g) {
     for (const p of particles) {
       g.globalAlpha = Math.max(0, p.life * 2);
       g.fillStyle = p.color;
@@ -375,7 +443,9 @@ const PoligonoGame = (() => {
       g.fill();
       g.globalAlpha = 1;
     }
+  }
 
+  function drawMarkers(g) {
     for (const m of markers) {
       const fade = Math.min(1, m.life * 2.8);
       g.globalAlpha = fade;
@@ -395,7 +465,6 @@ const PoligonoGame = (() => {
         g.fillText('+' + m.pts, m.x * w, m.y * h - 5);
       }
       if (!m.miss) {
-        // stronger hit X marker
         const s = m.size || 10;
         const mx = m.x * w, my = m.y * h;
         g.strokeStyle = 'rgba(20,16,12,0.85)';
@@ -413,13 +482,9 @@ const PoligonoGame = (() => {
       }
       g.globalAlpha = 1;
     }
-
-    drawCrosshair(g);
-    g.restore();
   }
 
   function drawRange(g) {
-    // bay walls / floor perspective
     const grd = g.createLinearGradient(0, 0, 0, h);
     grd.addColorStop(0, '#12100e');
     grd.addColorStop(0.45, '#1a1612');
@@ -427,11 +492,9 @@ const PoligonoGame = (() => {
     g.fillStyle = grd;
     g.fillRect(0, 0, w, h);
 
-    // back wall
     g.fillStyle = '#0e0c0a';
     g.fillRect(0, 0, w, h * 0.28);
 
-    // ceiling lights (dim amber)
     for (let i = 0; i < 5; i++) {
       const lx = w * (0.1 + i * 0.2);
       const lg = g.createRadialGradient(lx, h * 0.02, 0, lx, h * 0.02, h * 0.25);
@@ -441,7 +504,6 @@ const PoligonoGame = (() => {
       g.fillRect(lx - w * 0.2, 0, w * 0.4, h * 0.4);
     }
 
-    // lane lines / rails perspective
     g.strokeStyle = 'rgba(138,90,43,0.25)';
     g.lineWidth = 1;
     const vanishingY = h * 0.18;
@@ -453,7 +515,6 @@ const PoligonoGame = (() => {
       g.lineTo(x0, h * 0.92);
       g.stroke();
     }
-    // horizontal depth marks
     for (let lane = 0; lane < 3; lane++) {
       const y = laneY(lane) * h + 40 * laneScale(lane);
       g.strokeStyle = 'rgba(196,137,58,0.08)';
@@ -463,7 +524,6 @@ const PoligonoGame = (() => {
       g.stroke();
     }
 
-    // booth frame
     g.strokeStyle = 'rgba(196,137,58,0.2)';
     g.lineWidth = 3;
     g.strokeRect(8, 8, w - 16, h - 16);
@@ -474,11 +534,10 @@ const PoligonoGame = (() => {
   function drawTarget(g, t) {
     const x = t.x * w;
     const y = t.y * h;
-    const r = t.r;
+    const r = t.pixelR || t.r;
     g.save();
     if (t.hit) g.globalAlpha = Math.max(0, t.flash * 2);
 
-    // hanger
     g.strokeStyle = 'rgba(160,150,140,0.45)';
     g.lineWidth = 1.5;
     g.beginPath();
@@ -489,7 +548,6 @@ const PoligonoGame = (() => {
     g.fillRect(x - 10, y - r - 22, 20, 6);
 
     if (t.kind === 'steel') {
-      // steel plate silhouette (rounded rect-ish circle with metallic fill)
       const sg = g.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
       sg.addColorStop(0, '#9aa3ac');
       sg.addColorStop(1, '#3a4048');
@@ -500,7 +558,6 @@ const PoligonoGame = (() => {
       g.strokeStyle = '#c0c8d0';
       g.lineWidth = 2;
       g.stroke();
-      // rings etched
       g.strokeStyle = 'rgba(20,22,26,0.55)';
       g.lineWidth = 1.2;
       for (const ring of RINGS) {
@@ -513,7 +570,6 @@ const PoligonoGame = (() => {
       g.arc(x, y, r * 0.08, 0, Math.PI * 2);
       g.fill();
     } else {
-      // paper bullseye
       g.fillStyle = '#e8e2d6';
       g.beginPath();
       g.arc(x, y, r, 0, Math.PI * 2);
@@ -541,7 +597,6 @@ const PoligonoGame = (() => {
     const cy = (cross.y + recoil.y) * h;
     const s = 14;
 
-    // muzzle flash ring (brief, serious)
     if (muzzleFlash > 0 && !PoligonoInput.prefersReducedMotion()) {
       const a = Math.min(1, muzzleFlash);
       g.strokeStyle = 'rgba(232,184,106,' + (0.55 * a) + ')';
@@ -556,7 +611,6 @@ const PoligonoGame = (() => {
       g.stroke();
     }
 
-    // dark outline for contrast on light paper targets
     g.strokeStyle = 'rgba(12,10,8,0.75)';
     g.lineWidth = 3.2;
     g.beginPath();
@@ -584,7 +638,6 @@ const PoligonoGame = (() => {
     g.arc(cx, cy, 1.5, 0, Math.PI * 2);
     g.fill();
 
-    // outer ring
     g.strokeStyle = 'rgba(12,10,8,0.4)';
     g.lineWidth = 2;
     g.beginPath();

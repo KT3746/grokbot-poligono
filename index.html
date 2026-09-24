@@ -5,15 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#0a0908" />
   <meta name="description" content="POLÍGONO — estande de tiro ao alvo premium. Precisão, calibre e concentração." />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>POLÍGONO</title>
-  <link rel="stylesheet" href="css/style.css?v=202609221720" />
+  <link rel="stylesheet" href="css/style.css?v=202609241800" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230a0908'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23c4893a' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%23c4893a' stroke-width='1.5' opacity='0.7'/%3E%3Ccircle cx='32' cy='32' r='6' fill='none' stroke='%23e8b86a' stroke-width='1.5'/%3E%3Ccircle cx='32' cy='32' r='2' fill='%23e8b86a'/%3E%3C/svg%3E" />
 </head>
 <body>
   <div id="app">
     <canvas id="game" aria-label="Área do estande POLÍGONO"></canvas>
+    <canvas id="fx" aria-hidden="true"></canvas>
 
     <div id="hud" class="hud hidden" aria-live="polite">
       <div class="hud-left">
@@ -115,10 +117,13 @@
     </section>
   </div>
 
-  <script src="js/audio.js?v=202609221720"></script>
-  <script src="js/input.js?v=202609221720"></script>
-  <script src="js/game.js?v=202609221720"></script>
-  <script src="js/ui.js?v=202609221720"></script>
-  <script src="js/main.js?v=202609221720"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.min.js"
+    }
+  }
+  </script>
+  <script type="module" src="js/boot.js?v=202609241800"></script>
 </body>
 </html>

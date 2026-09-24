@@ -1,13 +1,20 @@
 /* POLÍGONO — boot & wiring */
 (function () {
   const canvas = document.getElementById('game');
+  const fxCanvas = document.getElementById('fx');
   const fireBtn = document.getElementById('btn-fire');
 
   let pendingMode = 'treino';
   let lastMode = 'treino';
 
+  const reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if (typeof PoligonoScene !== 'undefined') {
+    PoligonoScene.init({ canvas, reduceMotion });
+  }
+
   PoligonoGame.init({
     canvas,
+    fxCanvas,
     onHud: (state, mode) => PoligonoUI.updateHud(state, mode),
     onEnd: (state, mode) => {
       PoligonoGame.stop();
