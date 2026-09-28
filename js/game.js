@@ -56,7 +56,10 @@ const PoligonoGame = (() => {
   }
 
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const mobile = Math.min(window.innerWidth, window.innerHeight) <= 500
+      || !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    /* Cap phone ~1.25 (mesmo bar FRONTEIRA/ECO); desktop até 1.5. */
+    dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.5);
     w = canvas.clientWidth || window.innerWidth;
     h = canvas.clientHeight || window.innerHeight;
     if (use3d) {
@@ -193,6 +196,7 @@ const PoligonoGame = (() => {
   function frame(ts) {
     if (!running) return;
     if (paused) return;
+    if (document.hidden) return; /* sem sim com aba oculta */
     if (!lastTs) lastTs = ts;
     let dt = (ts - lastTs) / 1000;
     lastTs = ts;

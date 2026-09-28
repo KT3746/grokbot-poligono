@@ -1,4 +1,4 @@
-/* POLÍGONO — estande dark premium */
+/* POLÍGONO — estande dark premium, mobile-first (polish 390×844) */
 :root {
   --bg: #0a0908;
   --bg-deep: #050403;
@@ -130,7 +130,9 @@ html, body {
 .icon-btn {
   min-width: 44px;
   min-height: 44px;
-  padding: 0 10px;
+  width: 44px;
+  height: 44px;
+  padding: 0 8px;
   border: 1px solid var(--line);
   background: rgba(12, 10, 8, 0.75);
   color: var(--amber);
@@ -139,6 +141,7 @@ html, body {
   border-radius: 8px;
   cursor: pointer;
   font-family: inherit;
+  touch-action: manipulation;
 }
 
 .icon-btn:active { background: rgba(196, 137, 58, 0.2); }
@@ -237,6 +240,7 @@ html, body {
   display: block;
   width: 100%;
   min-height: 48px;
+  min-width: 44px;
   margin-top: 10px;
   padding: 12px 16px;
   border-radius: 10px;
@@ -247,6 +251,7 @@ html, body {
   font-family: inherit;
   cursor: pointer;
   letter-spacing: 0.04em;
+  touch-action: manipulation;
 }
 
 .btn.primary {
@@ -323,7 +328,50 @@ body.touch-ui #game { cursor: none; }
   body:not(.touch-ui) #game { cursor: crosshair; }
 }
 
+/* Portrait estreito (~390px): HUD compacto, alvos ≥44px */
+@media (max-width: 420px), (orientation: portrait) and (max-width: 430px) {
+  .hud {
+    padding: calc(8px + var(--safe-t)) 10px 6px;
+    padding-left: calc(10px + var(--safe-l));
+    padding-right: calc(10px + var(--safe-r));
+  }
+  .hud-left { gap: 8px 12px; }
+  .hud-block { min-width: 44px; }
+  .hud-label { font-size: 0.58rem; }
+  .hud-value { font-size: 0.95rem; }
+  .icon-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+  .fire-btn { width: 88px; height: 88px; font-size: 0.8rem; }
+  .panel { width: min(92vw, 360px); padding: 22px 18px; }
+}
+
+@media (max-height: 700px) and (max-width: 500px) {
+  .fire-zone { bottom: calc(14px + var(--safe-b)); right: calc(12px + var(--safe-r)); }
+  .fire-btn { width: 84px; height: 84px; }
+  .hud-value { font-size: 0.92rem; }
+}
+
+/* Paisagem baixa (~390px de altura) */
+@media (orientation: landscape) and (max-height: 430px) {
+  .hud {
+    padding: calc(4px + var(--safe-t)) 8px 4px;
+    padding-left: calc(8px + var(--safe-l));
+    padding-right: calc(8px + var(--safe-r));
+  }
+  .hud-left { gap: 6px 10px; }
+  .hud-block { min-width: 40px; }
+  .hud-label { font-size: 0.55rem; }
+  .hud-value { font-size: 0.85rem; }
+  .icon-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 0.62rem; }
+  .fire-zone { bottom: calc(8px + var(--safe-b)); right: calc(10px + var(--safe-r)); }
+  .fire-btn { width: 72px; height: 72px; font-size: 0.72rem; }
+  .panel { padding: 14px 14px 12px; max-height: min(92dvh, 360px); overflow: auto; }
+  .logo { font-size: clamp(1.6rem, 7vw, 2.2rem); margin-bottom: 4px; }
+  .btn { min-height: 44px; padding: 10px 14px; }
+  .overlay { padding: calc(8px + var(--safe-t)) 12px calc(8px + var(--safe-b)); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .fire-btn:active { transform: none; }
+  .btn, .icon-btn, .fire-btn { transition: none !important; animation: none !important; }
+  .fire-btn:active, .btn:active, .icon-btn:active { transform: none !important; }
   .overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
