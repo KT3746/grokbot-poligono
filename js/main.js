@@ -56,11 +56,13 @@
     PoligonoGame.setPaused(true);
     PoligonoUI.showPause();
     PoligonoAudio.ui();
+    try { PoligonoAudio.suspend(); } catch (_) { /* ok */ }
   }
 
   function resume() {
     PoligonoUI.hidePause();
     PoligonoGame.setPaused(false);
+    try { PoligonoAudio.resume(); } catch (_) { /* ok */ }
     PoligonoAudio.ui();
   }
 
@@ -98,6 +100,20 @@
 
   PoligonoUI.syncMuteLabels();
   PoligonoUI.showMenu();
+
+
+  /* Aba/app oculta mid-jogo: pausa + suspende áudio (mesmo bar FRONTEIRA/ECO). */
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      /* Continuar na pausa: áudio só volta com resume / Continuar. */
+      return;
+    }
+    try { PoligonoAudio.suspend(); } catch (_) { /* ok */ }
+    if (PoligonoGame.isRunning() && !PoligonoGame.isPaused()) {
+      PoligonoGame.setPaused(true);
+      PoligonoUI.showPause();
+    }
+  });
 
   // unlock audio on first gesture
   const unlock = () => {

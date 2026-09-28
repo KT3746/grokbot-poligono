@@ -107,6 +107,18 @@ const PoligonoAudio = (() => {
     }
   }
 
+  function suspend() {
+    if (ctx && ctx.state === 'running') {
+      try { ctx.suspend(); } catch (_) { /* ok */ }
+    }
+  }
+
+  function resume() {
+    if (!muted && ctx && ctx.state === 'suspended') {
+      try { ctx.resume(); } catch (_) { /* ok */ }
+    }
+  }
+
   loadMute();
-  return { ensure, setMuted, isMuted, shot, hit, miss, combo, ui, end };
+  return { ensure, setMuted, isMuted, shot, hit, miss, combo, ui, end, suspend, resume };
 })();

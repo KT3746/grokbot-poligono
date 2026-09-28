@@ -50,7 +50,8 @@ const PoligonoScene = (() => {
 
     try {
       const mobile = isMobileView();
-      const pr = Math.min(window.devicePixelRatio || 1, mobile ? 1.4 : 2);
+      /* Cap phone ~1.25 (mesmo bar FRONTEIRA/ECO); desktop até 1.5. */
+    const pr = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.5);
       renderer = new THREE.WebGLRenderer({
         canvas,
         antialias: !mobile && pr <= 1.5,
@@ -582,7 +583,8 @@ const PoligonoScene = (() => {
     w = nw || canvas.clientWidth || window.innerWidth;
     h = nh || canvas.clientHeight || window.innerHeight;
     const mobile = isMobileView();
-    const pr = Math.min(window.devicePixelRatio || 1, mobile ? 1.4 : 2);
+    /* Cap phone ~1.25 (mesmo bar FRONTEIRA/ECO); desktop até 1.5. */
+    const pr = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.5);
     renderer.setPixelRatio(pr);
     renderer.setSize(w, h, false);
     camera.aspect = w / Math.max(1, h);
