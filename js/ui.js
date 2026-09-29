@@ -1,6 +1,8 @@
 /* POLÍGONO — screens & labels */
 const PoligonoUI = (() => {
   const TIP_KEY = 'poligono-tip-seen';
+  let hintActive = false;
+  let hintLeaveTimer = null;
 
   function $(id) { return document.getElementById(id); }
 
@@ -23,6 +25,7 @@ const PoligonoUI = (() => {
     show('screen-menu');
     hide('hud');
     hide('fire-zone');
+    dismissHint(true);
     syncMuteLabels();
   }
 
@@ -83,9 +86,11 @@ const PoligonoUI = (() => {
     hideAllScreens();
     show('hud');
     applyFireButton();
+    showOnboardingHint();
   }
 
   function showResults(state, mode) {
+    dismissHint(true);
     hide('fire-zone');
     hideAllScreens();
     show('screen-results');
@@ -125,9 +130,18 @@ const PoligonoUI = (() => {
       const m = state.multiplier.toFixed(1).replace(/\.0$/, '');
       comboText = streak + ' · ×' + m;
     }
-    $('hud-combo').textContent = comboText;
-    if (state.combo >= 3) $('hud-combo').style.color = '#e8b86a';
-    else $('hud-combo').style.color = '';
+    const comboEl = $('hud-combo');
+    const prev = comboEl.dataset.streak || '0';
+    comboEl.textContent = comboText;
+    if (state.combo >= 3) comboEl.style.color = '#e8b86a';
+    else comboEl.style.color = '';
+    if (state.combo > 0 && String(state.combo) !== prev) {
+      comboEl.classList.remove('combo-pop');
+      // restart animation
+      void comboEl.offsetWidth;
+      comboEl.classList.add('combo-pop');
+    }
+    comboEl.dataset.streak = String(state.combo || 0);
 
     const tw = $('hud-time-wrap');
     if (mode === 'desafio') {
@@ -138,6 +152,46 @@ const PoligonoUI = (() => {
       tw.classList.add('hidden');
     }
   }
+
+
+  function hintCopy() {
+    return wantsFireButton()
+      ? 'Arraste para mirar · FOGO para disparar'
+      : 'Mire com o mouse · clique ou Espaço';
+  }
+
+  function showOnboardingHint() {
+    const bar = $('hint-bar');
+    if (!bar) return;
+    if (hintLeaveTimer) { clearTimeout(hintLeaveTimer); hintLeaveTimer = null; }
+    bar.textContent = hintCopy();
+    bar.classList.remove('is-leaving', 'hidden');
+    hintActive = true;
+  }
+
+  function dismissHint(immediate) {
+    const bar = $('hint-bar');
+    if (!hintActive && (!bar || bar.classList.contains('hidden'))) {
+      hintActive = false;
+      return;
+    }
+    hintActive = false;
+    if (!bar) return;
+    if (hintLeaveTimer) { clearTimeout(hintLeaveTimer); hintLeaveTimer = null; }
+    if (immediate) {
+      bar.classList.add('hidden');
+      bar.classList.remove('is-leaving');
+      return;
+    }
+    bar.classList.add('is-leaving');
+    hintLeaveTimer = setTimeout(() => {
+      bar.classList.add('hidden');
+      bar.classList.remove('is-leaving');
+      hintLeaveTimer = null;
+    }, 280);
+  }
+
+  function isHintActive() { return hintActive; }
 
   function syncMuteLabels() {
     const m = PoligonoAudio.isMuted();
@@ -160,6 +214,7 @@ const PoligonoUI = (() => {
   return {
     show, hide, showMenu, showTip, tipSeen, showMode,
     showPause, hidePause, showPlaying, showResults,
-    updateHud, syncMuteLabels, toggleMute, applyFireButton, wantsFireButton
+    updateHud, syncMuteLabels, toggleMute, applyFireButton, wantsFireButton,
+    showOnboardingHint, dismissHint, isHintActive
   };
 })();
