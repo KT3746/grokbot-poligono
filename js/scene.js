@@ -20,7 +20,7 @@ const PoligonoScene = (() => {
 
   let muzzleLight, hemi, keySpot, fillSpot;
   let camBase = { x: 0, y: 1.56, z: 3.15 };
-  let fx = { shake: 0, recoilX: 0, recoilY: 0, muzzle: 0 };
+  let fx = { shake: 0, recoilX: 0, recoilY: 0, muzzle: 0, hitFlash: 0 };
   let reduceMotion = false;
 
   const _v = { x: 0, y: 0, z: 0 };
@@ -528,11 +528,13 @@ const PoligonoScene = (() => {
     };
   }
 
-  function burstAt(t, kind) {
+  function burstAt(t, kind, intensity) {
     if (!ready) return;
     const p = worldOf(t);
     const col = kind === 'steel' ? 0xc0c8d0 : 0xc4893a;
-    emitSparks(p.x, p.y, p.z + 0.08, col, kind === 'steel' ? 14 : 10);
+    const mul = intensity || 1;
+    const n = Math.round((kind === 'steel' ? 14 : 10) * mul);
+    emitSparks(p.x, p.y, p.z + 0.08, col, reduceMotion ? Math.max(4, Math.floor(n * 0.4)) : n);
   }
 
   function missAt(nx, ny) {
@@ -552,6 +554,7 @@ const PoligonoScene = (() => {
     fx.recoilX = next.recoilX || 0;
     fx.recoilY = next.recoilY || 0;
     fx.muzzle = next.muzzle || 0;
+    fx.hitFlash = next.hitFlash || 0;
   }
 
   function setPlaying(v) { playing = !!v; }

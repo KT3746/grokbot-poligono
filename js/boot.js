@@ -17,7 +17,7 @@ function loadScript(src) {
   });
 }
 
-const v = '202609281315';
+const v = '202609290134';
 try {
   await loadScript('js/audio.js?v=' + v);
   await loadScript('js/input.js?v=' + v);

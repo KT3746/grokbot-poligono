@@ -26,6 +26,9 @@ const PoligonoGame = (() => {
   let recoil = { x: 0, y: 0 };
   let shake = 0;
   let muzzleFlash = 0;
+  let hitFlash = 0;
+  let hintDismissed = false;
+  let aimStart = null;
   let targets = [];
   let particles = [];
   let markers = [];
@@ -102,6 +105,9 @@ const PoligonoGame = (() => {
     recoil = { x: 0, y: 0 };
     shake = 0;
     muzzleFlash = 0;
+    hitFlash = 0;
+    hintDismissed = false;
+    aimStart = null;
     cross = { x: 0.5, y: 0.45 };
   }
 
@@ -218,8 +224,17 @@ const PoligonoGame = (() => {
     recoil.y *= Math.pow(0.01, dt);
     if (Math.abs(recoil.x) < 0.0001) recoil.x = 0;
     if (Math.abs(recoil.y) < 0.0001) recoil.y = 0;
-    shake = Math.max(0, shake - dt * 4);
+    shake = Math.max(0, shake - dt * 4.5);
     muzzleFlash = Math.max(0, muzzleFlash - dt * 8);
+    hitFlash = Math.max(0, hitFlash - dt * 3.2);
+
+    /* First-minute: some a dica após mirar de verdade ou disparar */
+    if (!hintDismissed && aim && aim.active) {
+      if (!aimStart) aimStart = { x: aim.x, y: aim.y };
+      else if (Math.hypot(aim.x - aimStart.x, aim.y - aimStart.y) > 0.035) {
+        noteFirstAction();
+      }
+    }
 
     if (mode === 'desafio' && !state.ended) {
       state.timeLeft -= dt;
@@ -292,6 +307,15 @@ const PoligonoGame = (() => {
     return null;
   }
 
+
+  function noteFirstAction() {
+    if (hintDismissed) return;
+    hintDismissed = true;
+    if (typeof PoligonoUI !== 'undefined' && PoligonoUI.dismissHint) {
+      PoligonoUI.dismissHint(false);
+    }
+  }
+
   function fire() {
     if (state.ended || paused || !running) return;
     PoligonoAudio.ensure();
@@ -303,9 +327,10 @@ const PoligonoGame = (() => {
     const px = cx * w;
     const py = cy * h;
 
+    noteFirstAction();
     recoil.x += (Math.random() * 0.02 - 0.01);
     recoil.y -= 0.018 + Math.random() * 0.01;
-    if (!PoligonoInput.prefersReducedMotion()) shake = 0.35;
+    if (!PoligonoInput.prefersReducedMotion()) shake = Math.max(shake, 0.28);
     muzzleFlash = 1;
 
     const hitInfo = use3d
@@ -325,8 +350,8 @@ const PoligonoGame = (() => {
 
     if (hitT && zone) {
       hitT.hit = true;
-      hitT.flash = 0.35;
-      hitT.life = 0.35;
+      hitT.flash = zone.name === 'centro' ? 0.48 : 0.35;
+      hitT.life = hitT.flash;
       state.hits++;
       state.combo++;
       if (state.combo > state.bestCombo) state.bestCombo = state.combo;
@@ -336,22 +361,36 @@ const PoligonoGame = (() => {
       PoligonoAudio.hit(zone.name);
       if (state.combo > 1 && state.combo % 3 === 0) PoligonoAudio.combo(state.combo);
 
+      /* Light juice: soft hit flash + shake escalonado (respeita reduced-motion) */
+      if (!PoligonoInput.prefersReducedMotion()) {
+        const shakeAmt = zone.name === 'centro' ? 0.55 : (zone.name === 'anel' ? 0.4 : 0.3);
+        shake = Math.max(shake, shakeAmt);
+        hitFlash = Math.max(hitFlash, zone.name === 'centro' ? 0.55 : 0.32);
+      } else {
+        hitFlash = Math.max(hitFlash, 0.18);
+      }
+
       const scr = screenOf(hitT);
       markers.push({
-        x: scr.x, y: scr.y, life: 0.55,
+        x: scr.x, y: scr.y, life: 0.62,
         text: zone.name === 'centro' ? 'CENTRO' : (zone.name === 'anel' ? 'ANEL' : 'BORDA'),
-        pts, size: zone.name === 'centro' ? 12 : 9
+        pts, size: zone.name === 'centro' ? 14 : 10,
+        pop: zone.name === 'centro'
       });
       if (state.combo > 1 && state.combo % 3 === 0) {
         markers.push({
-          x: cx, y: cy - 0.04, life: 0.7,
-          text: 'COMBO ×' + state.combo, pts: 0, toast: true
+          x: cx, y: cy - 0.05, life: 0.85,
+          text: 'COMBO ×' + state.combo, pts: 0, toast: true, pop: true
         });
       }
       if (use3d) {
-        PoligonoScene.burstAt(hitT, hitT.kind);
+        PoligonoScene.burstAt(hitT, hitT.kind, zone.name === 'centro' ? 1.35 : 1);
       } else {
-        burst(hitT.x * w, hitT.y * h, hitT.kind === 'steel' ? '#c0c8d0' : '#c4893a');
+        burst(
+          hitT.x * w, hitT.y * h,
+          hitT.kind === 'steel' ? '#c0c8d0' : '#c4893a',
+          zone.name === 'centro' ? 18 : 12
+        );
       }
 
       if (mode === 'desafio' && state.score >= state.goal) {
@@ -367,18 +406,19 @@ const PoligonoGame = (() => {
     hud();
   }
 
-  function burst(x, y, color) {
-    const n = PoligonoInput.prefersReducedMotion() ? 4 : 12;
+  function burst(x, y, color, count) {
+    const base = count || 12;
+    const n = PoligonoInput.prefersReducedMotion() ? Math.max(3, Math.floor(base * 0.35)) : base;
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
-      const sp = 40 + Math.random() * 120;
+      const sp = 45 + Math.random() * 140;
       particles.push({
         x, y,
         vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp - 30,
-        life: 0.25 + Math.random() * 0.35,
+        vy: Math.sin(a) * sp - 35,
+        life: 0.28 + Math.random() * 0.4,
         color,
-        r: 1.5 + Math.random() * 2.5
+        r: 1.6 + Math.random() * 2.8
       });
     }
   }
@@ -400,7 +440,7 @@ const PoligonoGame = (() => {
     if (use3d) {
       PoligonoScene.setReducedMotion(PoligonoInput.prefersReducedMotion());
       PoligonoScene.setFx({
-        shake, recoilX: recoil.x, recoilY: recoil.y, muzzle: muzzleFlash
+        shake, recoilX: recoil.x, recoilY: recoil.y, muzzle: muzzleFlash, hitFlash
       });
       PoligonoScene.syncTargets(targets);
       drawOverlay(fxCtx || ctx);
@@ -424,6 +464,7 @@ const PoligonoGame = (() => {
     const sorted = targets.slice().sort((a, b) => a.lane - b.lane);
     for (const t of sorted) drawTarget(g, t);
 
+    drawHitFlash(g);
     drawParticles(g);
     drawMarkers(g);
     drawCrosshair(g);
@@ -433,9 +474,21 @@ const PoligonoGame = (() => {
   function drawOverlay(g) {
     if (!g) return;
     g.clearRect(0, 0, w, h);
+    drawHitFlash(g);
     drawParticles(g);
     drawMarkers(g);
     if (running && !state.ended) drawCrosshair(g);
+  }
+
+  function drawHitFlash(g) {
+    if (hitFlash <= 0) return;
+    const a = Math.min(0.28, hitFlash * 0.42);
+    const grd = g.createRadialGradient(w * 0.5, h * 0.42, w * 0.08, w * 0.5, h * 0.42, w * 0.7);
+    grd.addColorStop(0, 'rgba(232,184,106,' + (a * 0.55) + ')');
+    grd.addColorStop(0.55, 'rgba(196,137,58,' + (a * 0.22) + ')');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
   }
 
   function drawParticles(g) {
@@ -455,18 +508,28 @@ const PoligonoGame = (() => {
       g.globalAlpha = fade;
       g.textAlign = 'center';
       if (m.toast) {
+        const pop = m.pop && !PoligonoInput.prefersReducedMotion()
+          ? (1 + Math.max(0, (m.life - 0.55) * 1.1))
+          : 1;
+        g.save();
+        g.translate(m.x * w, m.y * h);
+        g.scale(pop, pop);
         g.fillStyle = '#e8b86a';
-        g.font = 'bold 13px system-ui, sans-serif';
-        g.fillText(m.text, m.x * w, m.y * h);
+        g.font = 'bold 16px system-ui, sans-serif';
+        g.fillText(m.text, 0, 0);
+        g.restore();
         g.globalAlpha = 1;
         continue;
       }
       g.fillStyle = m.miss ? '#a84838' : '#e8b86a';
-      g.font = 'bold 14px system-ui, sans-serif';
-      g.fillText(m.text, m.x * w, m.y * h - 20);
+      const popHit = m.pop && !PoligonoInput.prefersReducedMotion()
+        ? (1 + Math.max(0, (m.life - 0.4) * 0.9))
+        : 1;
+      g.font = 'bold ' + Math.round(14 * popHit) + 'px system-ui, sans-serif';
+      g.fillText(m.text, m.x * w, m.y * h - 22);
       if (m.pts) {
-        g.font = '12px system-ui, sans-serif';
-        g.fillText('+' + m.pts, m.x * w, m.y * h - 5);
+        g.font = 'bold 13px system-ui, sans-serif';
+        g.fillText('+' + m.pts, m.x * w, m.y * h - 6);
       }
       if (!m.miss) {
         const s = m.size || 10;
