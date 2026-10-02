@@ -477,6 +477,16 @@ const PoligonoScene = (() => {
         rec.mat.emissiveIntensity = k * 1.4;
         rec.mat.transparent = true;
         rec.mat.opacity = Math.max(0, k);
+      } else if (t.telegraph > 0 && !reduceMotion) {
+        const ap = t.appear != null ? t.appear : (1 - t.telegraph / 0.48);
+        rec.root.rotation.x = 0;
+        rec.root.rotation.z = 0;
+        const scaleMul = 0.72 + ap * 0.28;
+        rec.disc.scale.set(r * scaleMul, r * scaleMul, 1);
+        rec.mat.emissive = new THREE.Color(0xc4893a);
+        rec.mat.emissiveIntensity = 0.15 + ap * 0.35;
+        rec.mat.transparent = true;
+        rec.mat.opacity = 0.25 + ap * 0.75;
       } else {
         rec.root.rotation.x = 0;
         rec.mat.emissiveIntensity = 0;
@@ -508,7 +518,7 @@ const PoligonoScene = (() => {
     for (let i = 0; i < hits.length; i++) {
       const h = hits[i];
       const tid = h.object.userData.tid;
-      const target = targets.find(t => t.id === tid && !t.hit);
+      const target = targets.find(t => t.id === tid && !t.hit && !(t.telegraph > 0.12));
       if (!target) continue;
       const local = h.object.worldToLocal(h.point.clone());
       const distNorm = Math.hypot(local.x, local.y);

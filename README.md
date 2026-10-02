@@ -18,7 +18,7 @@ Estande de tiro ao alvo no navegador — atmosfera indoor séria, precisa e adul
 | Celular | Arrastar o dedo na tela | Botão **FOGO** (canto inferior direito) | Botão **II** |
 | PC | Mover o mouse | Clique ou **Espaço** | **Esc** ou **II** |
 
-Som (mudo) e a dica de primeira vez ficam salvos no aparelho (`localStorage`).
+Som (mudo), a dica de primeira vez e o **melhor do dia** (precisão / combo) ficam salvos no aparelho (`localStorage`, dia em horário de Brasília).
 
 ## Modos
 
