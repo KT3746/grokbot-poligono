@@ -1,10 +1,80 @@
 /* POLÍGONO — screens & labels */
 const PoligonoUI = (() => {
   const TIP_KEY = 'poligono-tip-seen';
+  const DAILY_KEY = 'poligono-daily-meta';
   let hintActive = false;
   let hintLeaveTimer = null;
 
   function $(id) { return document.getElementById(id); }
+
+  function brtDayKey() {
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date());
+    } catch (_) {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+  }
+
+  function loadDaily() {
+    try {
+      const raw = localStorage.getItem(DAILY_KEY);
+      if (!raw) return { day: brtDayKey(), bestAcc: 0, bestCombo: 0 };
+      const data = JSON.parse(raw);
+      if (!data || data.day !== brtDayKey()) return { day: brtDayKey(), bestAcc: 0, bestCombo: 0 };
+      return {
+        day: data.day,
+        bestAcc: Math.max(0, Number(data.bestAcc) || 0),
+        bestCombo: Math.max(0, Number(data.bestCombo) || 0)
+      };
+    } catch (_) {
+      return { day: brtDayKey(), bestAcc: 0, bestCombo: 0 };
+    }
+  }
+
+  function saveDaily(data) {
+    try { localStorage.setItem(DAILY_KEY, JSON.stringify(data)); } catch (_) {}
+  }
+
+  function formatDailyLine(meta) {
+    if (!meta || (!meta.bestAcc && !meta.bestCombo)) {
+      return 'Melhor do dia: ainda sem marca';
+    }
+    const bits = [];
+    if (meta.bestAcc > 0) bits.push('precisão ' + meta.bestAcc + '%');
+    if (meta.bestCombo > 0) bits.push('combo ×' + meta.bestCombo);
+    return 'Melhor do dia: ' + bits.join(' · ');
+  }
+
+  function refreshDailyMeta() {
+    const line = formatDailyLine(loadDaily());
+    const menu = $('menu-daily');
+    if (menu) menu.textContent = line;
+    return line;
+  }
+
+  /** Soft update: only raises daily bests; returns what improved. */
+  function recordDaily(acc, bestCombo) {
+    const meta = loadDaily();
+    const out = { accNew: false, comboNew: false, meta };
+    const a = (acc == null || isNaN(acc)) ? 0 : Math.max(0, Math.min(100, Math.round(acc)));
+    const c = Math.max(0, Math.round(bestCombo || 0));
+    if (a > 0 && a >= meta.bestAcc) {
+      if (a > meta.bestAcc) out.accNew = true;
+      meta.bestAcc = a;
+    }
+    if (c > 0 && c >= meta.bestCombo) {
+      if (c > meta.bestCombo) out.comboNew = true;
+      meta.bestCombo = c;
+    }
+    saveDaily(meta);
+    out.meta = meta;
+    refreshDailyMeta();
+    return out;
+  }
 
   function show(id) {
     const el = $(id);
@@ -27,6 +97,7 @@ const PoligonoUI = (() => {
     hide('fire-zone');
     dismissHint(true);
     syncMuteLabels();
+    refreshDailyMeta();
   }
 
   function showTip(then) {
@@ -109,11 +180,69 @@ const PoligonoUI = (() => {
     $('results-title').textContent = mode === 'desafio'
       ? (win ? 'Desafio concluído' : 'Desafio encerrado')
       : 'Treino encerrado';
+
+    const shots = state.shots || 0;
+    const hits = state.hits || 0;
+    const accNum = shots ? Math.round((hits / shots) * 100) : null;
+    const accLabel = accNum == null ? '—' : (accNum + '%');
+    const bestCombo = state.bestCombo || 0;
+
     $('res-score').textContent = String(state.score);
-    const acc = state.shots ? Math.round((state.hits / state.shots) * 100) + '%' : '—';
-    $('res-acc').textContent = acc;
-    $('res-combo').textContent = '×' + state.bestCombo;
-    $('res-shots').textContent = String(state.shots);
+    $('res-acc').textContent = accLabel;
+    $('res-combo').textContent = '×' + bestCombo;
+    $('res-shots').textContent = String(shots);
+
+    const hitsEl = $('res-hits');
+    if (hitsEl) {
+      hitsEl.textContent = shots
+        ? (hits + ' acerto' + (hits === 1 ? '' : 's') + ' de ' + shots)
+        : 'nenhum tiro';
+    }
+
+    const summary = $('results-summary');
+    if (summary) {
+      if (!shots) {
+        summary.textContent = 'Nenhum disparo nesta sessão.';
+      } else {
+        summary.textContent = hits + ' acerto' + (hits === 1 ? '' : 's')
+          + ' · precisão ' + accLabel
+          + ' · melhor combo ×' + bestCombo
+          + ' · ' + state.score + ' pts';
+      }
+    }
+
+    const bar = $('res-acc-bar');
+    if (bar) {
+      const pct = accNum == null ? 0 : accNum;
+      bar.style.width = pct + '%';
+      bar.classList.toggle('is-good', pct >= 70);
+      bar.classList.toggle('is-ok', pct >= 40 && pct < 70);
+      bar.classList.toggle('is-low', pct > 0 && pct < 40);
+    }
+
+    const recorded = recordDaily(accNum, bestCombo);
+    const accNote = $('res-acc-note');
+    const comboNote = $('res-combo-note');
+    if (accNote) {
+      accNote.textContent = recorded.accNew ? 'novo melhor do dia' : '';
+      accNote.classList.toggle('is-record', !!recorded.accNew);
+    }
+    if (comboNote) {
+      comboNote.textContent = recorded.comboNew ? 'novo melhor do dia' : '';
+      comboNote.classList.toggle('is-record', !!recorded.comboNew);
+    }
+
+    const dailyEl = $('results-daily');
+    if (dailyEl) {
+      dailyEl.textContent = formatDailyLine(recorded.meta);
+    }
+
+    const panel = document.querySelector('#screen-results .panel');
+    if (panel) {
+      panel.classList.remove('results-enter');
+      void panel.offsetWidth;
+      panel.classList.add('results-enter');
+    }
   }
 
   function updateHud(state, mode) {
@@ -255,6 +384,7 @@ const PoligonoUI = (() => {
     showPause, hidePause, showPlaying, showResults,
     updateHud, syncMuteLabels, toggleMute, applyFireButton, wantsFireButton,
     showOnboardingHint, dismissHint, isHintActive,
-    pulseAccuracy, pulseCombo
+    pulseAccuracy, pulseCombo,
+    refreshDailyMeta, loadDaily, recordDaily
   };
 })();

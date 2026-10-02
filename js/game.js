@@ -177,6 +177,8 @@ const PoligonoGame = (() => {
     const kind = Math.random() < 0.35 ? 'steel' : 'paper';
     const y = laneY(lane) + (Math.random() * 0.04 - 0.02);
     const x = 0.12 + Math.random() * 0.76;
+    const reduce = typeof PoligonoInput !== 'undefined' && PoligonoInput.prefersReducedMotion
+      && PoligonoInput.prefersReducedMotion();
     const t = {
       x, y, r: use3d ? sizeWorld : pixelR,
       sizeWorld, pixelR, lane, kind,
@@ -186,6 +188,9 @@ const PoligonoGame = (() => {
       life: 8 + Math.random() * 6,
       hit: false,
       flash: 0,
+      /* Spawn telegraph: soft ring + fade-in; reduced-motion → instant ready */
+      telegraph: reduce ? 0 : 0.48,
+      appear: reduce ? 1 : 0,
       id: Math.random().toString(36).slice(2)
     };
     for (const o of targets) {
@@ -260,6 +265,14 @@ const PoligonoGame = (() => {
 
     for (const t of targets) {
       if (t.hit) continue;
+      if (t.telegraph > 0) {
+        t.telegraph = Math.max(0, t.telegraph - dt);
+        /* Soft ease-in: appear 0→1 as telegraph drains */
+        t.appear = 1 - (t.telegraph / 0.48);
+        if (t.telegraph <= 0) t.appear = 1;
+        continue; /* still forming — no move / life decay yet */
+      }
+      if (t.appear < 1) t.appear = 1;
       t.life -= dt;
       if (t.moving) {
         t.x += t.vx * dt;
@@ -300,7 +313,7 @@ const PoligonoGame = (() => {
   }
 
   function pick2d(px, py) {
-    const sorted = targets.slice().filter(t => !t.hit).sort((a, b) => b.lane - a.lane);
+    const sorted = targets.slice().filter(t => !t.hit && !(t.telegraph > 0.12)).sort((a, b) => b.lane - a.lane);
     for (const t of sorted) {
       const dx = px - t.x * w;
       const dy = py - t.y * h;
@@ -525,11 +538,34 @@ const PoligonoGame = (() => {
   function drawOverlay(g) {
     if (!g) return;
     g.clearRect(0, 0, w, h);
+    drawSpawnTelegraphs(g);
     drawHitFlash(g);
     drawMissFlash(g);
     drawParticles(g);
     drawMarkers(g);
     if (running && !state.ended) drawCrosshair(g);
+  }
+
+  function drawSpawnTelegraphs(g) {
+    if (!g || PoligonoInput.prefersReducedMotion()) return;
+    for (const t of targets) {
+      if (t.hit || !(t.telegraph > 0)) continue;
+      const p = screenOf(t);
+      const x = p.x * w;
+      const y = p.y * h;
+      const base = use3d ? (28 + t.lane * 6) : (t.pixelR || t.r);
+      const k = t.telegraph / 0.48;
+      const ringR = base * (1.6 + k * 0.7);
+      g.strokeStyle = 'rgba(232,184,106,' + (0.2 + (1 - k) * 0.45) + ')';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(x, y, ringR, 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = 'rgba(232,184,106,' + (0.06 + (1 - k) * 0.1) + ')';
+      g.beginPath();
+      g.arc(x, y, base * (0.7 + (1 - k) * 0.35), 0, Math.PI * 2);
+      g.fill();
+    }
   }
 
   function drawHitFlash(g) {
@@ -668,6 +704,25 @@ const PoligonoGame = (() => {
     const r = t.pixelR || t.r;
     g.save();
     if (t.hit) g.globalAlpha = Math.max(0, t.flash * 2);
+    else if (t.telegraph > 0 || (t.appear != null && t.appear < 1)) {
+      const ap = t.appear != null ? t.appear : 1;
+      g.globalAlpha = 0.22 + ap * 0.78;
+      /* Soft spawn telegraph ring (reduced-motion skips via telegraph=0) */
+      if (t.telegraph > 0) {
+        const k = t.telegraph / 0.48;
+        const ringR = r * (1.55 + k * 0.55);
+        g.strokeStyle = 'rgba(232,184,106,' + (0.18 + (1 - k) * 0.42) + ')';
+        g.lineWidth = 2;
+        g.beginPath();
+        g.arc(x, y, ringR, 0, Math.PI * 2);
+        g.stroke();
+        g.strokeStyle = 'rgba(196,137,58,' + (0.12 + (1 - k) * 0.28) + ')';
+        g.lineWidth = 1.2;
+        g.beginPath();
+        g.arc(x, y, r * (0.85 + ap * 0.2), 0, Math.PI * 2);
+        g.stroke();
+      }
+    }
 
     g.strokeStyle = 'rgba(160,150,140,0.45)';
     g.lineWidth = 1.5;
