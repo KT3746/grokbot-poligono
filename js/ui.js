@@ -53,6 +53,14 @@ const PoligonoUI = (() => {
 
   function showPause() {
     show('screen-pause');
+    const panel = document.querySelector('#screen-pause .panel');
+    if (panel) {
+      panel.classList.add('pause-panel');
+      /* restart attention pulse for mobile clarity */
+      panel.classList.remove('pause-enter');
+      void panel.offsetWidth;
+      panel.classList.add('pause-enter');
+    }
   }
 
   function hidePause() {
@@ -133,6 +141,8 @@ const PoligonoUI = (() => {
     const comboEl = $('hud-combo');
     const prev = comboEl.dataset.streak || '0';
     comboEl.textContent = comboText;
+    comboEl.classList.toggle('combo-hot', state.combo >= 3);
+    comboEl.classList.toggle('combo-broken', false);
     if (state.combo >= 3) comboEl.style.color = '#e8b86a';
     else comboEl.style.color = '';
     if (state.combo > 0 && String(state.combo) !== prev) {
@@ -193,6 +203,35 @@ const PoligonoUI = (() => {
 
   function isHintActive() { return hintActive; }
 
+  function pulseAccuracy(kind) {
+    const el = $('hud-acc');
+    if (!el) return;
+    el.classList.remove('acc-pulse', 'acc-perfect');
+    void el.offsetWidth;
+    el.classList.add('acc-pulse');
+    if (kind === 'perfect') el.classList.add('acc-perfect');
+  }
+
+  function pulseCombo(n, opts) {
+    const comboEl = $('hud-combo');
+    if (!comboEl) return;
+    opts = opts || {};
+    if (opts.broke) {
+      comboEl.classList.remove('combo-hot', 'combo-pop');
+      comboEl.classList.add('combo-broken');
+      void comboEl.offsetWidth;
+      // brief red flash then clear
+      setTimeout(() => comboEl.classList.remove('combo-broken'), 420);
+      return;
+    }
+    if (n >= 3) {
+      comboEl.classList.add('combo-hot');
+      comboEl.classList.remove('combo-pop');
+      void comboEl.offsetWidth;
+      comboEl.classList.add('combo-pop');
+    }
+  }
+
   function syncMuteLabels() {
     const m = PoligonoAudio.isMuted();
     const menu = $('btn-mute-menu');
@@ -215,6 +254,7 @@ const PoligonoUI = (() => {
     show, hide, showMenu, showTip, tipSeen, showMode,
     showPause, hidePause, showPlaying, showResults,
     updateHud, syncMuteLabels, toggleMute, applyFireButton, wantsFireButton,
-    showOnboardingHint, dismissHint, isHintActive
+    showOnboardingHint, dismissHint, isHintActive,
+    pulseAccuracy, pulseCombo
   };
 })();

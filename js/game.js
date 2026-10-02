@@ -27,6 +27,8 @@ const PoligonoGame = (() => {
   let shake = 0;
   let muzzleFlash = 0;
   let hitFlash = 0;
+  let missFlash = 0;
+  let perfectFlash = 0;
   let hintDismissed = false;
   let aimStart = null;
   let targets = [];
@@ -106,6 +108,8 @@ const PoligonoGame = (() => {
     shake = 0;
     muzzleFlash = 0;
     hitFlash = 0;
+    missFlash = 0;
+    perfectFlash = 0;
     hintDismissed = false;
     aimStart = null;
     cross = { x: 0.5, y: 0.45 };
@@ -227,6 +231,8 @@ const PoligonoGame = (() => {
     shake = Math.max(0, shake - dt * 4.5);
     muzzleFlash = Math.max(0, muzzleFlash - dt * 8);
     hitFlash = Math.max(0, hitFlash - dt * 3.2);
+    missFlash = Math.max(0, missFlash - dt * 4.0);
+    perfectFlash = Math.max(0, perfectFlash - dt * 2.8);
 
     /* First-minute: some a dica após mirar de verdade ou disparar */
     if (!hintDismissed && aim && aim.active) {
@@ -362,26 +368,49 @@ const PoligonoGame = (() => {
       if (state.combo > 1 && state.combo % 3 === 0) PoligonoAudio.combo(state.combo);
 
       /* Light juice: soft hit flash + shake escalonado (respeita reduced-motion) */
+      const isCentro = zone.name === 'centro';
       if (!PoligonoInput.prefersReducedMotion()) {
-        const shakeAmt = zone.name === 'centro' ? 0.55 : (zone.name === 'anel' ? 0.4 : 0.3);
+        const shakeAmt = isCentro ? 0.55 : (zone.name === 'anel' ? 0.4 : 0.3);
         shake = Math.max(shake, shakeAmt);
-        hitFlash = Math.max(hitFlash, zone.name === 'centro' ? 0.55 : 0.32);
+        hitFlash = Math.max(hitFlash, isCentro ? 0.55 : 0.32);
+        /* Combo streak juice: extra amber punch every 3 hits */
+        if (state.combo > 1 && state.combo % 3 === 0) {
+          hitFlash = Math.max(hitFlash, 0.72);
+          shake = Math.max(shake, 0.7);
+        }
+        if (isCentro) perfectFlash = Math.max(perfectFlash, 0.95);
       } else {
-        hitFlash = Math.max(hitFlash, 0.18);
+        hitFlash = Math.max(hitFlash, isCentro ? 0.28 : 0.18);
+        if (isCentro) perfectFlash = Math.max(perfectFlash, 0.35);
       }
 
       const scr = screenOf(hitT);
       markers.push({
-        x: scr.x, y: scr.y, life: 0.62,
-        text: zone.name === 'centro' ? 'CENTRO' : (zone.name === 'anel' ? 'ANEL' : 'BORDA'),
-        pts, size: zone.name === 'centro' ? 14 : 10,
-        pop: zone.name === 'centro'
+        x: scr.x, y: scr.y, life: isCentro ? 0.78 : 0.62,
+        text: isCentro ? 'PERFEITO' : (zone.name === 'anel' ? 'ANEL' : 'BORDA'),
+        pts, size: isCentro ? 16 : 10,
+        pop: isCentro, perfect: isCentro
       });
+      if (isCentro) {
+        markers.push({
+          x: scr.x, y: scr.y - 0.06, life: 0.7,
+          text: 'CENTRO', pts: 0, toast: true, pop: true, perfect: true
+        });
+      }
       if (state.combo > 1 && state.combo % 3 === 0) {
         markers.push({
-          x: cx, y: cy - 0.05, life: 0.85,
-          text: 'COMBO ×' + state.combo, pts: 0, toast: true, pop: true
+          x: cx, y: cy - 0.05, life: 0.95,
+          text: 'COMBO ×' + state.combo, pts: 0, toast: true, pop: true, streak: true
         });
+      }
+      /* Accuracy meter pulse on centro / streak (DOM) */
+      if (typeof PoligonoUI !== 'undefined' && PoligonoUI.pulseAccuracy) {
+        if (isCentro || (state.combo > 1 && state.combo % 3 === 0)) {
+          PoligonoUI.pulseAccuracy(isCentro ? 'perfect' : 'streak');
+        }
+      }
+      if (typeof PoligonoUI !== 'undefined' && PoligonoUI.pulseCombo) {
+        PoligonoUI.pulseCombo(state.combo);
       }
       if (use3d) {
         PoligonoScene.burstAt(hitT, hitT.kind, zone.name === 'centro' ? 1.35 : 1);
@@ -397,10 +426,31 @@ const PoligonoGame = (() => {
         finish(true);
       }
     } else {
+      const broke = state.combo >= 2;
+      const hadStreak = state.combo;
       state.combo = 0;
       state.multiplier = 1;
       PoligonoAudio.miss();
-      markers.push({ x: cx, y: cy, life: 0.3, text: '×', pts: 0, miss: true });
+      /* Miss flash — clearer feedback; gated reduced-motion (weaker/static tint) */
+      if (!PoligonoInput.prefersReducedMotion()) {
+        missFlash = Math.max(missFlash, broke ? 0.85 : 0.55);
+        shake = Math.max(shake, broke ? 0.35 : 0.18);
+      } else {
+        missFlash = Math.max(missFlash, 0.32);
+      }
+      markers.push({
+        x: cx, y: cy, life: broke ? 0.55 : 0.42,
+        text: 'ERROU', pts: 0, miss: true, pop: true
+      });
+      if (broke) {
+        markers.push({
+          x: cx, y: cy - 0.07, life: 0.75,
+          text: 'COMBO QUEBRADO', pts: 0, toast: true, miss: true
+        });
+      }
+      if (typeof PoligonoUI !== 'undefined' && PoligonoUI.pulseCombo) {
+        PoligonoUI.pulseCombo(0, { broke: hadStreak > 0 });
+      }
       if (use3d) PoligonoScene.missAt(cx, cy);
     }
     hud();
@@ -440,7 +490,7 @@ const PoligonoGame = (() => {
     if (use3d) {
       PoligonoScene.setReducedMotion(PoligonoInput.prefersReducedMotion());
       PoligonoScene.setFx({
-        shake, recoilX: recoil.x, recoilY: recoil.y, muzzle: muzzleFlash, hitFlash
+        shake, recoilX: recoil.x, recoilY: recoil.y, muzzle: muzzleFlash, hitFlash, missFlash, perfectFlash
       });
       PoligonoScene.syncTargets(targets);
       drawOverlay(fxCtx || ctx);
@@ -465,6 +515,7 @@ const PoligonoGame = (() => {
     for (const t of sorted) drawTarget(g, t);
 
     drawHitFlash(g);
+    drawMissFlash(g);
     drawParticles(g);
     drawMarkers(g);
     drawCrosshair(g);
@@ -475,6 +526,7 @@ const PoligonoGame = (() => {
     if (!g) return;
     g.clearRect(0, 0, w, h);
     drawHitFlash(g);
+    drawMissFlash(g);
     drawParticles(g);
     drawMarkers(g);
     if (running && !state.ended) drawCrosshair(g);
@@ -487,6 +539,18 @@ const PoligonoGame = (() => {
     grd.addColorStop(0, 'rgba(232,184,106,' + (a * 0.55) + ')');
     grd.addColorStop(0.55, 'rgba(196,137,58,' + (a * 0.22) + ')');
     grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+  }
+
+  function drawMissFlash(g) {
+    if (missFlash <= 0) return;
+    const a = Math.min(0.42, missFlash * 0.5);
+    /* Red edge vignette — clear miss cue without covering the lane */
+    const grd = g.createRadialGradient(w * 0.5, h * 0.45, w * 0.22, w * 0.5, h * 0.45, w * 0.78);
+    grd.addColorStop(0, 'rgba(0,0,0,0)');
+    grd.addColorStop(0.55, 'rgba(168,72,56,' + (a * 0.18) + ')');
+    grd.addColorStop(1, 'rgba(168,72,56,' + (a * 0.55) + ')');
     g.fillStyle = grd;
     g.fillRect(0, 0, w, h);
   }
@@ -514,8 +578,8 @@ const PoligonoGame = (() => {
         g.save();
         g.translate(m.x * w, m.y * h);
         g.scale(pop, pop);
-        g.fillStyle = '#e8b86a';
-        g.font = 'bold 16px system-ui, sans-serif';
+        g.fillStyle = m.miss ? '#d46858' : (m.perfect ? '#ffe6a8' : '#e8b86a');
+        g.font = 'bold ' + (m.streak ? 18 : 16) + 'px system-ui, sans-serif';
         g.fillText(m.text, 0, 0);
         g.restore();
         g.globalAlpha = 1;
@@ -662,7 +726,13 @@ const PoligonoGame = (() => {
   function drawCrosshair(g) {
     const cx = (cross.x + recoil.x) * w;
     const cy = (cross.y + recoil.y) * h;
-    const s = 14;
+    const touchUi = document.body.classList.contains('touch-ui');
+    const aim = PoligonoInput.getAim();
+    const aiming = !!(aim && aim.active);
+    /* Mobile: larger reticle + clearer aim-active ring */
+    const s = touchUi ? 18 : 14;
+    const gap = touchUi ? 5 : 4;
+    const ringR = touchUi ? 28 : 22;
 
     if (muzzleFlash > 0 && !PoligonoInput.prefersReducedMotion()) {
       const a = Math.min(1, muzzleFlash);
@@ -678,42 +748,72 @@ const PoligonoGame = (() => {
       g.stroke();
     }
 
+    /* Perfect-center reward ring */
+    if (perfectFlash > 0) {
+      const a = Math.min(1, perfectFlash);
+      const expand = PoligonoInput.prefersReducedMotion() ? 0 : (1 - a) * 26;
+      g.strokeStyle = 'rgba(255,230,168,' + (0.75 * a) + ')';
+      g.lineWidth = touchUi ? 2.6 : 2.2;
+      g.beginPath();
+      g.arc(cx, cy, ringR + 4 + expand, 0, Math.PI * 2);
+      g.stroke();
+      g.strokeStyle = 'rgba(232,184,106,' + (0.45 * a) + ')';
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.arc(cx, cy, ringR - 2 + expand * 0.5, 0, Math.PI * 2);
+      g.stroke();
+    }
+
+    /* Touch aim-active: soft pulse ring so mira feedback is obvious */
+    if (touchUi && aiming) {
+      const pulse = PoligonoInput.prefersReducedMotion()
+        ? 0.55
+        : (0.4 + 0.35 * Math.abs(Math.sin(performance.now() / 220)));
+      g.strokeStyle = 'rgba(232,184,106,' + pulse + ')';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(cx, cy, ringR + 6, 0, Math.PI * 2);
+      g.stroke();
+    }
+
     g.strokeStyle = 'rgba(12,10,8,0.75)';
-    g.lineWidth = 3.2;
+    g.lineWidth = touchUi ? 3.8 : 3.2;
     g.beginPath();
-    g.moveTo(cx - s, cy); g.lineTo(cx - 4, cy);
-    g.moveTo(cx + 4, cy); g.lineTo(cx + s, cy);
-    g.moveTo(cx, cy - s); g.lineTo(cx, cy - 4);
-    g.moveTo(cx, cy + 4); g.lineTo(cx, cy + s);
+    g.moveTo(cx - s, cy); g.lineTo(cx - gap, cy);
+    g.moveTo(cx + gap, cy); g.lineTo(cx + s, cy);
+    g.moveTo(cx, cy - s); g.lineTo(cx, cy - gap);
+    g.moveTo(cx, cy + gap); g.lineTo(cx, cy + s);
     g.stroke();
 
     g.strokeStyle = 'rgba(232,184,106,0.95)';
-    g.lineWidth = 1.5;
+    g.lineWidth = touchUi ? 2 : 1.5;
     g.beginPath();
-    g.moveTo(cx - s, cy); g.lineTo(cx - 4, cy);
-    g.moveTo(cx + 4, cy); g.lineTo(cx + s, cy);
-    g.moveTo(cx, cy - s); g.lineTo(cx, cy - 4);
-    g.moveTo(cx, cy + 4); g.lineTo(cx, cy + s);
+    g.moveTo(cx - s, cy); g.lineTo(cx - gap, cy);
+    g.moveTo(cx + gap, cy); g.lineTo(cx + s, cy);
+    g.moveTo(cx, cy - s); g.lineTo(cx, cy - gap);
+    g.moveTo(cx, cy + gap); g.lineTo(cx, cy + s);
     g.stroke();
 
     g.fillStyle = 'rgba(12,10,8,0.7)';
     g.beginPath();
-    g.arc(cx, cy, 2.4, 0, Math.PI * 2);
+    g.arc(cx, cy, touchUi ? 3 : 2.4, 0, Math.PI * 2);
     g.fill();
     g.fillStyle = 'rgba(232,184,106,0.95)';
     g.beginPath();
-    g.arc(cx, cy, 1.5, 0, Math.PI * 2);
+    g.arc(cx, cy, touchUi ? 1.9 : 1.5, 0, Math.PI * 2);
     g.fill();
 
     g.strokeStyle = 'rgba(12,10,8,0.4)';
     g.lineWidth = 2;
     g.beginPath();
-    g.arc(cx, cy, 22, 0, Math.PI * 2);
+    g.arc(cx, cy, ringR, 0, Math.PI * 2);
     g.stroke();
-    g.strokeStyle = 'rgba(196,137,58,0.4)';
-    g.lineWidth = 1;
+    g.strokeStyle = aiming && touchUi
+      ? 'rgba(232,184,106,0.7)'
+      : 'rgba(196,137,58,0.4)';
+    g.lineWidth = touchUi ? 1.4 : 1;
     g.beginPath();
-    g.arc(cx, cy, 22, 0, Math.PI * 2);
+    g.arc(cx, cy, ringR, 0, Math.PI * 2);
     g.stroke();
   }
 

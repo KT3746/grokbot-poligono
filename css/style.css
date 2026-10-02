@@ -185,6 +185,67 @@ html, body {
   100% { transform: scale(1); }
 }
 
+.hud-value.combo-hot {
+  color: var(--amber-bright) !important;
+  text-shadow: 0 0 12px rgba(232,184,106,0.45);
+}
+.hud-value.combo-broken {
+  color: #d46858 !important;
+  animation: combo-break 0.4s ease-out;
+}
+@keyframes combo-break {
+  0% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Accuracy meter pulse (perfect-center / streak) */
+.hud-value.acc-pulse {
+  animation: acc-pulse 0.48s ease-out;
+}
+.hud-value.acc-perfect {
+  color: #ffe6a8 !important;
+  text-shadow: 0 0 14px rgba(255,230,168,0.55);
+}
+@keyframes acc-pulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+
+/* Pause overlay clarity (mobile) */
+.pause-panel {
+  border-color: rgba(232,184,106,0.45);
+  box-shadow:
+    0 20px 50px rgba(0,0,0,0.6),
+    0 0 0 1px rgba(232,184,106,0.12),
+    inset 0 1px 0 rgba(232,184,106,0.12);
+}
+.pause-panel.pause-enter {
+  animation: pause-enter 0.32s ease-out;
+}
+@keyframes pause-enter {
+  0% { transform: scale(0.96); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pause-badge {
+  color: var(--amber-bright);
+  letter-spacing: 0.2em;
+}
+.pause-hint {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+  margin: 0 0 16px;
+}
+.pause-hint strong { color: var(--amber-bright); font-weight: 600; }
+#screen-pause.overlay {
+  background: rgba(5, 4, 3, 0.86);
+}
+#btn-resume {
+  box-shadow: 0 0 0 2px rgba(232,184,106,0.22), 0 8px 22px rgba(0,0,0,0.4);
+  min-height: 48px;
+}
+
 /* Fire button — mobile one-handed */
 .fire-zone {
   position: absolute;
@@ -414,7 +475,12 @@ body.touch-ui #game { cursor: none; }
 @media (prefers-reduced-motion: reduce) {
   .btn, .icon-btn, .fire-btn, .hint-bar { transition: none !important; animation: none !important; }
   .fire-btn:active, .btn:active, .icon-btn:active { transform: none !important; }
-  .hud-value.combo-pop { animation: none !important; }
+  .hud-value.combo-pop,
+  .hud-value.combo-broken,
+  .hud-value.acc-pulse,
+  .pause-panel.pause-enter { animation: none !important; }
   .hint-bar.is-leaving { opacity: 0; transform: translateX(-50%); }
   .overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .hud-value.combo-hot { text-shadow: none; }
+  .hud-value.acc-perfect { text-shadow: none; }
 }
