@@ -96,6 +96,7 @@ const PoligonoUI = (() => {
     hide('hud');
     hide('fire-zone');
     dismissHint(true);
+    hideCountdown(true);
     syncMuteLabels();
     refreshDailyMeta();
   }
@@ -170,6 +171,7 @@ const PoligonoUI = (() => {
 
   function showResults(state, mode) {
     dismissHint(true);
+    hideCountdown(true);
     hide('fire-zone');
     hideAllScreens();
     show('screen-results');
@@ -249,13 +251,23 @@ const PoligonoUI = (() => {
     const scoreEl = $('hud-score');
     const goalEl = $('hud-goal');
     scoreEl.textContent = String(state.score);
+    const goalMeter = $('hud-goal-meter');
+    const goalFill = $('hud-goal-fill');
     if (mode === 'desafio' && state.goal > 0) {
       if (goalEl) {
         goalEl.textContent = state.score + '/' + state.goal;
         goalEl.classList.remove('hidden');
       }
-    } else if (goalEl) {
-      goalEl.classList.add('hidden');
+      if (goalMeter && goalFill) {
+        goalMeter.classList.remove('hidden');
+        const pct = Math.max(0, Math.min(100, Math.round((state.score / state.goal) * 100)));
+        goalFill.style.width = pct + '%';
+        goalMeter.classList.toggle('is-hot', pct >= 80);
+        goalMeter.classList.toggle('is-done', pct >= 100);
+      }
+    } else {
+      if (goalEl) goalEl.classList.add('hidden');
+      if (goalMeter) goalMeter.classList.add('hidden');
     }
     const acc = state.shots ? Math.round((state.hits / state.shots) * 100) + '%' : '—';
     $('hud-acc').textContent = acc;
@@ -282,16 +294,30 @@ const PoligonoUI = (() => {
     }
     comboEl.dataset.streak = String(state.combo || 0);
 
+    /* Combo meter: fill toward next × step (every 3 hits) */
+    const fill = $('hud-combo-fill');
+    if (fill) {
+      const step = streak % 3;
+      const pct = streak === 0 ? 0 : (step === 0 ? 100 : (step / 3) * 100);
+      fill.style.width = pct + '%';
+      fill.classList.toggle('is-full', streak > 0 && step === 0);
+    }
+
     const tw = $('hud-time-wrap');
+    const timeEl = $('hud-time');
     if (mode === 'desafio') {
       tw.classList.remove('hidden');
-      const t = Math.ceil(state.timeLeft);
-      $('hud-time').textContent = t + 's';
+      const tLeft = Math.ceil(state.timeLeft);
+      timeEl.textContent = tLeft + 's';
+      const urgent = tLeft > 0 && tLeft <= 10 && !(state.warmup > 0);
+      timeEl.classList.toggle('time-urgent', urgent);
+      tw.classList.toggle('time-urgent-wrap', urgent);
     } else {
       tw.classList.add('hidden');
+      if (timeEl) timeEl.classList.remove('time-urgent');
+      tw.classList.remove('time-urgent-wrap');
     }
   }
-
 
   function hintCopy() {
     return wantsFireButton()
@@ -331,6 +357,34 @@ const PoligonoUI = (() => {
   }
 
   function isHintActive() { return hintActive; }
+
+  function showCountdown(n) {
+    const wrap = $('countdown');
+    const num = $('countdown-num');
+    if (!wrap || !num) return;
+    wrap.classList.remove('hidden', 'is-out');
+    const go = n === 0;
+    num.textContent = go ? 'FOGO!' : String(n);
+    wrap.classList.toggle('is-go', go);
+    wrap.classList.remove('is-tick');
+    void wrap.offsetWidth;
+    wrap.classList.add('is-tick');
+  }
+
+  function hideCountdown(immediate) {
+    const wrap = $('countdown');
+    if (!wrap) return;
+    if (immediate) {
+      wrap.classList.add('hidden');
+      wrap.classList.remove('is-tick', 'is-go', 'is-out');
+      return;
+    }
+    wrap.classList.add('is-out');
+    setTimeout(() => {
+      wrap.classList.add('hidden');
+      wrap.classList.remove('is-tick', 'is-go', 'is-out');
+    }, 280);
+  }
 
   function pulseAccuracy(kind) {
     const el = $('hud-acc');
@@ -385,6 +439,7 @@ const PoligonoUI = (() => {
     updateHud, syncMuteLabels, toggleMute, applyFireButton, wantsFireButton,
     showOnboardingHint, dismissHint, isHintActive,
     pulseAccuracy, pulseCombo,
+    showCountdown, hideCountdown,
     refreshDailyMeta, loadDaily, recordDaily
   };
 })();

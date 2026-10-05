@@ -29,6 +29,10 @@ const PoligonoGame = (() => {
   let hitFlash = 0;
   let missFlash = 0;
   let perfectFlash = 0;
+  let warmup = 0;          /* 3·2·1 before live fire */
+  let lastWarmupTick = -1;
+  let aimLocked = false;
+  let aimLockTargetId = null;
   let hintDismissed = false;
   let aimStart = null;
   let targets = [];
@@ -110,6 +114,10 @@ const PoligonoGame = (() => {
     hitFlash = 0;
     missFlash = 0;
     perfectFlash = 0;
+    warmup = 3.0;
+    lastWarmupTick = -1;
+    aimLocked = false;
+    aimLockTargetId = null;
     hintDismissed = false;
     aimStart = null;
     cross = { x: 0.5, y: 0.45 };
@@ -122,6 +130,19 @@ const PoligonoGame = (() => {
     lastTs = 0;
     if (use3d) PoligonoScene.setPlaying(true);
     spawnInitial();
+    if (PoligonoInput.prefersReducedMotion()) {
+      warmup = 0.55; /* brief beat, no long 3·2·1 */
+      lastWarmupTick = 1;
+      if (typeof PoligonoUI !== 'undefined' && PoligonoUI.showCountdown) {
+        PoligonoUI.showCountdown(0);
+      }
+    } else if (typeof PoligonoUI !== 'undefined' && PoligonoUI.showCountdown) {
+      PoligonoUI.showCountdown(3);
+      lastWarmupTick = 3;
+      if (typeof PoligonoAudio !== 'undefined' && PoligonoAudio.haptic) {
+        PoligonoAudio.haptic(6);
+      }
+    }
     hud();
     requestAnimationFrame(frame);
   }
@@ -129,6 +150,11 @@ const PoligonoGame = (() => {
   function stop() {
     running = false;
     paused = false;
+    warmup = 0;
+    if (typeof PoligonoUI !== 'undefined' && PoligonoUI.hideCountdown) {
+      PoligonoUI.hideCountdown(true);
+    }
+    setFireReady(false);
     if (use3d) {
       PoligonoScene.setPlaying(false);
       PoligonoScene.syncTargets([]);
@@ -151,7 +177,95 @@ const PoligonoGame = (() => {
   function getMode() { return mode; }
 
   function hud() {
-    if (onHud) onHud(state, mode);
+    if (onHud) onHud(Object.assign({}, state, {
+      warmup: warmup,
+      aimLocked: aimLocked,
+      comboStep: state.combo % 3
+    }), mode);
+  }
+
+  function setFireReady(on) {
+    const btn = document.getElementById('btn-fire');
+    if (!btn) return;
+    btn.classList.toggle('is-ready', !!on);
+    btn.setAttribute('aria-label', on ? 'Disparar — mira no alvo' : 'Disparar');
+  }
+
+  function kickFireBtn() {
+    const btn = document.getElementById('btn-fire');
+    if (!btn) return;
+    btn.classList.remove('is-kick');
+    void btn.offsetWidth;
+    btn.classList.add('is-kick');
+    setTimeout(() => btn.classList.remove('is-kick'), 220);
+  }
+
+  function updateAimLock() {
+    const cx = cross.x + recoil.x;
+    const cy = cross.y + recoil.y;
+    let locked = false;
+    let tid = null;
+    const sorted = targets.slice().filter(t => !t.hit && !(t.telegraph > 0.12));
+    if (use3d && typeof PoligonoScene !== 'undefined') {
+      const hitInfo = PoligonoScene.pick(cx, cy, sorted);
+      if (hitInfo && hitInfo.target && hitInfo.distNorm <= 1) {
+        locked = true;
+        tid = hitInfo.target.id;
+      }
+    } else {
+      const px = cx * w, py = cy * h;
+      for (const tgt of sorted) {
+        const dx = px - tgt.x * w;
+        const dy = py - tgt.y * h;
+        const rad = tgt.pixelR || tgt.r;
+        if (Math.hypot(dx, dy) <= rad) {
+          locked = true;
+          tid = tgt.id;
+          break;
+        }
+      }
+    }
+    const gained = locked && tid && tid !== aimLockTargetId;
+    aimLocked = locked;
+    aimLockTargetId = tid;
+    setFireReady(locked && warmup <= 0);
+    if (gained && warmup <= 0 && typeof PoligonoAudio !== 'undefined' && PoligonoAudio.haptic) {
+      PoligonoAudio.haptic(5);
+    }
+  }
+
+  function tickWarmup(dt) {
+    if (warmup <= 0) return;
+    const prev = warmup;
+    warmup = Math.max(0, warmup - dt);
+    const tick = warmup > 0 ? Math.ceil(warmup) : 0;
+    /* Only announce when the displayed digit drops (3→2→1→0) */
+    if (tick < lastWarmupTick) {
+      lastWarmupTick = tick;
+      if (tick > 0) {
+        if (typeof PoligonoUI !== 'undefined' && PoligonoUI.showCountdown) {
+          PoligonoUI.showCountdown(tick);
+        }
+        if (typeof PoligonoAudio !== 'undefined') {
+          if (PoligonoAudio.ui) PoligonoAudio.ui();
+          if (PoligonoAudio.haptic) PoligonoAudio.haptic(6);
+        }
+      }
+    }
+    if (prev > 0 && warmup <= 0) {
+      lastWarmupTick = 0;
+      if (typeof PoligonoUI !== 'undefined' && PoligonoUI.showCountdown) {
+        PoligonoUI.showCountdown(0); /* FOGO! */
+      }
+      if (typeof PoligonoAudio !== 'undefined' && PoligonoAudio.haptic) {
+        PoligonoAudio.haptic(18);
+      }
+      setTimeout(() => {
+        if (running && typeof PoligonoUI !== 'undefined' && PoligonoUI.hideCountdown) {
+          PoligonoUI.hideCountdown(false);
+        }
+      }, 420);
+    }
   }
 
   function spawnInitial() {
@@ -239,6 +353,9 @@ const PoligonoGame = (() => {
     missFlash = Math.max(0, missFlash - dt * 4.0);
     perfectFlash = Math.max(0, perfectFlash - dt * 2.8);
 
+    tickWarmup(dt);
+    updateAimLock();
+
     /* First-minute: some a dica após mirar de verdade ou disparar */
     if (!hintDismissed && aim && aim.active) {
       if (!aimStart) aimStart = { x: aim.x, y: aim.y };
@@ -247,7 +364,7 @@ const PoligonoGame = (() => {
       }
     }
 
-    if (mode === 'desafio' && !state.ended) {
+    if (mode === 'desafio' && !state.ended && warmup <= 0) {
       state.timeLeft -= dt;
       if (state.timeLeft <= 0) {
         state.timeLeft = 0;
@@ -298,7 +415,10 @@ const PoligonoGame = (() => {
     for (const m of markers) m.life -= dt;
     markers = markers.filter(m => m.life > 0);
 
-    if (PoligonoInput.consumeFire()) fire();
+    if (PoligonoInput.consumeFire()) {
+      if (warmup > 0) { /* ignore shots during 3·2·1 */ }
+      else fire();
+    }
 
     if (mode === 'desafio' && state.score >= state.wave * 400) {
       state.wave++;
@@ -336,9 +456,10 @@ const PoligonoGame = (() => {
   }
 
   function fire() {
-    if (state.ended || paused || !running) return;
+    if (state.ended || paused || !running || warmup > 0) return;
     PoligonoAudio.ensure();
     PoligonoAudio.shot();
+    kickFireBtn();
     state.shots++;
 
     const cx = cross.x + recoil.x;
@@ -379,6 +500,11 @@ const PoligonoGame = (() => {
       state.score += pts;
       PoligonoAudio.hit(zone.name);
       if (state.combo > 1 && state.combo % 3 === 0) PoligonoAudio.combo(state.combo);
+      if (PoligonoAudio.haptic) {
+        if (zone.name === 'centro') PoligonoAudio.haptic([18, 30, 22]);
+        else if (state.combo > 1 && state.combo % 3 === 0) PoligonoAudio.haptic([12, 35, 18]);
+        else PoligonoAudio.haptic(10);
+      }
 
       /* Light juice: soft hit flash + shake escalonado (respeita reduced-motion) */
       const isCentro = zone.name === 'centro';
@@ -444,6 +570,7 @@ const PoligonoGame = (() => {
       state.combo = 0;
       state.multiplier = 1;
       PoligonoAudio.miss();
+      if (PoligonoAudio.haptic) PoligonoAudio.haptic(broke ? [8, 40, 14] : 8);
       /* Miss flash — clearer feedback; gated reduced-motion (weaker/static tint) */
       if (!PoligonoInput.prefersReducedMotion()) {
         missFlash = Math.max(missFlash, broke ? 0.85 : 0.55);
@@ -820,7 +947,7 @@ const PoligonoGame = (() => {
     }
 
     /* Touch aim-active: soft pulse ring so mira feedback is obvious */
-    if (touchUi && aiming) {
+    if (touchUi && aiming && !aimLocked) {
       const pulse = PoligonoInput.prefersReducedMotion()
         ? 0.55
         : (0.4 + 0.35 * Math.abs(Math.sin(performance.now() / 220)));
@@ -828,6 +955,33 @@ const PoligonoGame = (() => {
       g.lineWidth = 2;
       g.beginPath();
       g.arc(cx, cy, ringR + 6, 0, Math.PI * 2);
+      g.stroke();
+    }
+
+    /* Aim lock — reticle on a ready target (mobile FOGO cue) */
+    if (aimLocked && warmup <= 0) {
+      const pulse = PoligonoInput.prefersReducedMotion()
+        ? 0.85
+        : (0.65 + 0.3 * Math.abs(Math.sin(performance.now() / 160)));
+      g.strokeStyle = 'rgba(255,230,168,' + pulse + ')';
+      g.lineWidth = touchUi ? 3 : 2.4;
+      g.beginPath();
+      g.arc(cx, cy, ringR + (touchUi ? 10 : 8), 0, Math.PI * 2);
+      g.stroke();
+      g.strokeStyle = 'rgba(232,184,106,' + (0.45 * pulse) + ')';
+      g.lineWidth = 1.4;
+      g.beginPath();
+      g.arc(cx, cy, ringR + (touchUi ? 4 : 3), 0, Math.PI * 2);
+      g.stroke();
+      /* diamond ticks */
+      const d = ringR + (touchUi ? 14 : 12);
+      g.strokeStyle = 'rgba(255,230,168,' + (0.9 * pulse) + ')';
+      g.lineWidth = touchUi ? 2 : 1.6;
+      g.beginPath();
+      g.moveTo(cx, cy - d - 4); g.lineTo(cx, cy - d + 2);
+      g.moveTo(cx, cy + d - 2); g.lineTo(cx, cy + d + 4);
+      g.moveTo(cx - d - 4, cy); g.lineTo(cx - d + 2, cy);
+      g.moveTo(cx + d - 2, cy); g.lineTo(cx + d + 4, cy);
       g.stroke();
     }
 
@@ -863,9 +1017,11 @@ const PoligonoGame = (() => {
     g.beginPath();
     g.arc(cx, cy, ringR, 0, Math.PI * 2);
     g.stroke();
-    g.strokeStyle = aiming && touchUi
-      ? 'rgba(232,184,106,0.7)'
-      : 'rgba(196,137,58,0.4)';
+    g.strokeStyle = aimLocked
+      ? 'rgba(255,230,168,0.9)'
+      : (aiming && touchUi
+        ? 'rgba(232,184,106,0.7)'
+        : 'rgba(196,137,58,0.4)');
     g.lineWidth = touchUi ? 1.4 : 1;
     g.beginPath();
     g.arc(cx, cy, ringR, 0, Math.PI * 2);

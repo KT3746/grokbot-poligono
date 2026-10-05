@@ -67,6 +67,15 @@ const PoligonoAudio = (() => {
     src.start();
   }
 
+
+  function haptic(pattern) {
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        navigator.vibrate(pattern == null ? 12 : pattern);
+      }
+    } catch (_) { /* ok */ }
+  }
+
   function shot() {
     noiseBurst(0.14, 0.38, 220);
     noiseBurst(0.06, 0.18, 900);
@@ -120,5 +129,5 @@ const PoligonoAudio = (() => {
   }
 
   loadMute();
-  return { ensure, setMuted, isMuted, shot, hit, miss, combo, ui, end, suspend, resume };
+  return { ensure, setMuted, isMuted, shot, hit, miss, combo, ui, end, suspend, resume, haptic };
 })();
