@@ -97,6 +97,7 @@ const PoligonoUI = (() => {
     hide('fire-zone');
     dismissHint(true);
     hideCountdown(true);
+    hideWaveBanner(true);
     syncMuteLabels();
     refreshDailyMeta();
   }
@@ -172,6 +173,7 @@ const PoligonoUI = (() => {
   function showResults(state, mode) {
     dismissHint(true);
     hideCountdown(true);
+    hideWaveBanner(true);
     hide('fire-zone');
     hideAllScreens();
     show('screen-results');
@@ -206,9 +208,11 @@ const PoligonoUI = (() => {
       if (!shots) {
         summary.textContent = 'Nenhum disparo nesta sessão.';
       } else {
+        const bp = state.bestPerfect || 0;
         summary.textContent = hits + ' acerto' + (hits === 1 ? '' : 's')
           + ' · precisão ' + accLabel
           + ' · melhor combo ×' + bestCombo
+          + (bp >= 2 ? (' · centros ×' + bp) : '')
           + ' · ' + state.score + ' pts';
       }
     }
@@ -303,6 +307,21 @@ const PoligonoUI = (() => {
       fill.classList.toggle('is-full', streak > 0 && step === 0);
     }
 
+    /* Wave 4: consecutive centers chip */
+    const centrosWrap = $('hud-centros-wrap');
+    const centrosEl = $('hud-centros');
+    if (centrosWrap && centrosEl) {
+      const ps = Math.max(0, state.perfectStreak || 0);
+      if (ps >= 1) {
+        centrosWrap.classList.remove('hidden');
+        centrosEl.textContent = '◎ ' + ps;
+        centrosEl.classList.toggle('centros-hot', ps >= 3);
+      } else {
+        centrosWrap.classList.add('hidden');
+        centrosEl.classList.remove('centros-hot');
+      }
+    }
+
     const tw = $('hud-time-wrap');
     const timeEl = $('hud-time');
     if (mode === 'desafio') {
@@ -386,6 +405,35 @@ const PoligonoUI = (() => {
     }, 280);
   }
 
+  let waveBannerTimer = null;
+  function showWaveBanner(n) {
+    const wrap = $('wave-banner');
+    const text = $('wave-banner-text');
+    if (!wrap || !text) return;
+    text.textContent = 'ONDA ' + n;
+    wrap.classList.remove('hidden', 'is-out');
+    wrap.classList.remove('is-in');
+    void wrap.offsetWidth;
+    wrap.classList.add('is-in');
+    if (waveBannerTimer) clearTimeout(waveBannerTimer);
+    waveBannerTimer = setTimeout(() => hideWaveBanner(false), 1100);
+  }
+  function hideWaveBanner(immediate) {
+    const wrap = $('wave-banner');
+    if (waveBannerTimer) { clearTimeout(waveBannerTimer); waveBannerTimer = null; }
+    if (!wrap) return;
+    if (immediate) {
+      wrap.classList.add('hidden');
+      wrap.classList.remove('is-in', 'is-out');
+      return;
+    }
+    wrap.classList.add('is-out');
+    setTimeout(() => {
+      wrap.classList.add('hidden');
+      wrap.classList.remove('is-in', 'is-out');
+    }, 280);
+  }
+
   function pulseAccuracy(kind) {
     const el = $('hud-acc');
     if (!el) return;
@@ -440,6 +488,7 @@ const PoligonoUI = (() => {
     showOnboardingHint, dismissHint, isHintActive,
     pulseAccuracy, pulseCombo,
     showCountdown, hideCountdown,
+    showWaveBanner, hideWaveBanner,
     refreshDailyMeta, loadDaily, recordDaily
   };
 })();

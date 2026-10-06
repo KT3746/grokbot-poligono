@@ -487,6 +487,19 @@ const PoligonoScene = (() => {
         rec.mat.emissiveIntensity = 0.15 + ap * 0.35;
         rec.mat.transparent = true;
         rec.mat.opacity = 0.25 + ap * 0.75;
+      } else if (t.urgent && !t.hit) {
+        /* Wave 4: target about to despawn — warm red pulse */
+        rec.root.rotation.x = 0;
+        const pulse = reduceMotion ? 0.55 : (0.4 + 0.55 * Math.abs(Math.sin(performance.now() * 0.008)));
+        rec.mat.emissive = new THREE.Color(0xd46858);
+        rec.mat.emissiveIntensity = 0.35 + pulse * 0.55;
+        rec.mat.transparent = false;
+        rec.mat.opacity = 1;
+        if (t.moving && !reduceMotion) {
+          rec.root.rotation.z = Math.sin(performance.now() * 0.002 + p.x) * 0.03;
+        } else {
+          rec.root.rotation.z = 0;
+        }
       } else {
         rec.root.rotation.x = 0;
         rec.mat.emissiveIntensity = 0;

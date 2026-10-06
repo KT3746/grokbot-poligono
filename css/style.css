@@ -257,6 +257,10 @@ html, body {
 
 .fire-btn {
   pointer-events: auto;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 96px;
   height: 96px;
   border-radius: 50%;
@@ -681,4 +685,95 @@ body.touch-ui #game { cursor: none; }
   .overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
   .hud-value.combo-hot { text-shadow: none; }
   .hud-value.acc-perfect { text-shadow: none; }
+}
+
+
+/* —— Wave 4: urgency cue, near-miss, FOGO recover, centros, onda banner —— */
+.fire-btn .fire-label {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+.fire-recover {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  background: conic-gradient(
+    from -90deg,
+    rgba(232,184,106,0.85) 0deg,
+    rgba(232,184,106,0.85) var(--recover, 0deg),
+    rgba(20,16,12,0.15) var(--recover, 0deg),
+    rgba(20,16,12,0.15) 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  transition: opacity 0.12s ease-out;
+}
+.fire-btn.is-recovering {
+  filter: brightness(0.92);
+  box-shadow: 0 0 0 3px rgba(196,137,58,0.22), 0 8px 24px rgba(0,0,0,0.55);
+}
+.fire-btn.is-recovering.is-ready {
+  animation: none;
+}
+.fire-btn.is-recovering.is-ready::after {
+  opacity: 0.35;
+}
+
+.hud-centros-block .hud-value {
+  color: #e8b86a;
+  letter-spacing: 0.02em;
+}
+.hud-centros-block .hud-value.centros-hot {
+  color: #ffe6a8;
+  text-shadow: 0 0 10px rgba(255,230,168,0.45);
+}
+
+.wave-banner {
+  position: absolute;
+  left: 50%;
+  top: calc(18% + var(--safe-t));
+  transform: translateX(-50%) scale(0.92);
+  z-index: 14;
+  pointer-events: none;
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: rgba(12,10,8,0.78);
+  border: 1px solid rgba(232,184,106,0.45);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.45), 0 0 24px rgba(196,137,58,0.18);
+  opacity: 0;
+}
+.wave-banner.hidden { display: none !important; }
+.wave-banner span {
+  font-size: clamp(0.95rem, 4.2vw, 1.25rem);
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: #ffe6a8;
+  text-shadow: 0 0 16px rgba(255,230,168,0.35);
+}
+.wave-banner.is-in {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  transition: opacity 0.22s ease-out, transform 0.28s cubic-bezier(.2,1.3,.4,1);
+}
+.wave-banner.is-out {
+  opacity: 0;
+  transform: translateX(-50%) scale(0.96);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+}
+
+@media (max-width: 420px), (orientation: portrait) and (max-width: 430px) {
+  .hud-centros-block { min-width: 44px; }
+  .wave-banner { top: calc(16% + var(--safe-t)); padding: 8px 16px; }
+  .wave-banner span { letter-spacing: 0.16em; font-size: 0.9rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wave-banner.is-in,
+  .wave-banner.is-out,
+  .fire-recover { transition: none !important; }
+  .hud-centros-block .hud-value.centros-hot { text-shadow: none; }
 }

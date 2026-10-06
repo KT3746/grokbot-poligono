@@ -19,7 +19,9 @@ const PoligonoGame = (() => {
     wave: 0,
     goal: 0,
     ended: false,
-    win: false
+    win: false,
+    perfectStreak: 0,
+    bestPerfect: 0
   };
 
   let cross = { x: 0.5, y: 0.45 };
@@ -35,6 +37,9 @@ const PoligonoGame = (() => {
   let aimLockTargetId = null;
   let hintDismissed = false;
   let aimStart = null;
+  let fireRecover = 0;     /* wave4: FOGO settle ring after shot */
+  const FIRE_RECOVER = 0.26;
+  const URGENT_LIFE = 2.55;
   let targets = [];
   let particles = [];
   let markers = [];
@@ -97,6 +102,9 @@ const PoligonoGame = (() => {
     state.ended = false;
     state.win = false;
     state.wave = 1;
+    state.perfectStreak = 0;
+    state.bestPerfect = 0;
+    fireRecover = 0;
     if (mode === 'desafio') {
       state.timeLeft = 60;
       state.goal = 1200;
@@ -155,6 +163,10 @@ const PoligonoGame = (() => {
       PoligonoUI.hideCountdown(true);
     }
     setFireReady(false);
+    setFireRecover(0);
+    if (typeof PoligonoUI !== 'undefined' && PoligonoUI.hideWaveBanner) {
+      PoligonoUI.hideWaveBanner(true);
+    }
     if (use3d) {
       PoligonoScene.setPlaying(false);
       PoligonoScene.syncTargets([]);
@@ -180,7 +192,9 @@ const PoligonoGame = (() => {
     if (onHud) onHud(Object.assign({}, state, {
       warmup: warmup,
       aimLocked: aimLocked,
-      comboStep: state.combo % 3
+      comboStep: state.combo % 3,
+      fireRecover: fireRecover,
+      fireRecoverMax: FIRE_RECOVER
     }), mode);
   }
 
@@ -198,6 +212,21 @@ const PoligonoGame = (() => {
     void btn.offsetWidth;
     btn.classList.add('is-kick');
     setTimeout(() => btn.classList.remove('is-kick'), 220);
+  }
+
+  function setFireRecover(t) {
+    fireRecover = Math.max(0, t);
+    const btn = document.getElementById('btn-fire');
+    const ring = document.getElementById('fire-recover');
+    const pct = FIRE_RECOVER > 0 ? Math.min(1, fireRecover / FIRE_RECOVER) : 0;
+    if (btn) {
+      btn.classList.toggle('is-recovering', pct > 0.04);
+    }
+    if (ring) {
+      const deg = Math.round(pct * 360);
+      ring.style.setProperty('--recover', deg + 'deg');
+      ring.style.opacity = pct > 0.04 ? '1' : '0';
+    }
   }
 
   function updateAimLock() {
@@ -305,6 +334,7 @@ const PoligonoGame = (() => {
       /* Spawn telegraph: soft ring + fade-in; reduced-motion → instant ready */
       telegraph: reduce ? 0 : 0.48,
       appear: reduce ? 1 : 0,
+      urgent: false,
       id: Math.random().toString(36).slice(2)
     };
     for (const o of targets) {
@@ -356,6 +386,10 @@ const PoligonoGame = (() => {
     tickWarmup(dt);
     updateAimLock();
 
+    if (fireRecover > 0) {
+      setFireRecover(fireRecover - dt);
+    }
+
     /* First-minute: some a dica após mirar de verdade ou disparar */
     if (!hintDismissed && aim && aim.active) {
       if (!aimStart) aimStart = { x: aim.x, y: aim.y };
@@ -391,6 +425,19 @@ const PoligonoGame = (() => {
       }
       if (t.appear < 1) t.appear = 1;
       t.life -= dt;
+      /* Wave 4: urgency when target is about to leave */
+      const wasUrgent = !!t.urgent;
+      t.urgent = t.life > 0 && t.life <= URGENT_LIFE;
+      if (t.urgent && !wasUrgent && !PoligonoInput.prefersReducedMotion()) {
+        const scr = screenOf(t);
+        markers.push({
+          x: scr.x, y: scr.y - 0.08, life: 0.7,
+          text: 'SUMINDO', pts: 0, toast: true, urgent: true
+        });
+        if (typeof PoligonoAudio !== 'undefined' && PoligonoAudio.haptic) {
+          PoligonoAudio.haptic(4);
+        }
+      }
       if (t.moving) {
         t.x += t.vx * dt;
         if (t.bounce) {
@@ -422,6 +469,13 @@ const PoligonoGame = (() => {
 
     if (mode === 'desafio' && state.score >= state.wave * 400) {
       state.wave++;
+      if (typeof PoligonoUI !== 'undefined' && PoligonoUI.showWaveBanner) {
+        PoligonoUI.showWaveBanner(state.wave);
+      }
+      if (typeof PoligonoAudio !== 'undefined') {
+        if (PoligonoAudio.ui) PoligonoAudio.ui();
+        if (PoligonoAudio.haptic) PoligonoAudio.haptic([10, 40, 14]);
+      }
     }
 
     hud();
@@ -457,9 +511,11 @@ const PoligonoGame = (() => {
 
   function fire() {
     if (state.ended || paused || !running || warmup > 0) return;
+    if (fireRecover > 0.08) return; /* wave4: settle before next shot */
     PoligonoAudio.ensure();
     PoligonoAudio.shot();
     kickFireBtn();
+    setFireRecover(FIRE_RECOVER);
     state.shots++;
 
     const cx = cross.x + recoil.x;
@@ -498,6 +554,13 @@ const PoligonoGame = (() => {
       state.multiplier = 1 + Math.min(4, Math.floor(state.combo / 3)) * 0.5;
       const pts = Math.round(zone.pts * state.multiplier);
       state.score += pts;
+      /* Wave 4: consecutive centers */
+      if (zone.name === 'centro') {
+        state.perfectStreak++;
+        if (state.perfectStreak > state.bestPerfect) state.bestPerfect = state.perfectStreak;
+      } else {
+        state.perfectStreak = 0;
+      }
       PoligonoAudio.hit(zone.name);
       if (state.combo > 1 && state.combo % 3 === 0) PoligonoAudio.combo(state.combo);
       if (PoligonoAudio.haptic) {
@@ -535,6 +598,12 @@ const PoligonoGame = (() => {
           x: scr.x, y: scr.y - 0.06, life: 0.7,
           text: 'CENTRO', pts: 0, toast: true, pop: true, perfect: true
         });
+        if (state.perfectStreak >= 2) {
+          markers.push({
+            x: scr.x, y: scr.y - 0.12, life: 0.85,
+            text: '◎ ×' + state.perfectStreak, pts: 0, toast: true, pop: true, perfect: true
+          });
+        }
       }
       if (state.combo > 1 && state.combo % 3 === 0) {
         markers.push({
@@ -567,25 +636,67 @@ const PoligonoGame = (() => {
     } else {
       const broke = state.combo >= 2;
       const hadStreak = state.combo;
+      const hadPerfect = state.perfectStreak;
       state.combo = 0;
       state.multiplier = 1;
+      state.perfectStreak = 0;
+      /* Wave 4: near-miss if shot grazed a ready target */
+      let near = null;
+      let nearDist = 9;
+      const ready = targets.filter(t => !t.hit && !(t.telegraph > 0.12));
+      if (use3d && typeof PoligonoScene !== 'undefined') {
+        for (const t of ready) {
+          const p = PoligonoScene.project(t);
+          const d = Math.hypot((cx - p.x) * w, (cy - p.y) * h);
+          const rad = Math.max(22, (t.pixelR || 36) * 1.05);
+          const dn = d / rad;
+          if (dn > 1 && dn < 1.55 && dn < nearDist) {
+            nearDist = dn;
+            near = { t, p, dn };
+          }
+        }
+      } else {
+        for (const t of ready) {
+          const dx = px - t.x * w;
+          const dy = py - t.y * h;
+          const rad = t.pixelR || t.r;
+          const dn = Math.hypot(dx, dy) / Math.max(1, rad);
+          if (dn > 1 && dn < 1.55 && dn < nearDist) {
+            nearDist = dn;
+            near = { t, p: { x: t.x, y: t.y }, dn };
+          }
+        }
+      }
       PoligonoAudio.miss();
-      if (PoligonoAudio.haptic) PoligonoAudio.haptic(broke ? [8, 40, 14] : 8);
+      if (PoligonoAudio.haptic) PoligonoAudio.haptic(broke ? [8, 40, 14] : (near ? [6, 25, 8] : 8));
       /* Miss flash — clearer feedback; gated reduced-motion (weaker/static tint) */
       if (!PoligonoInput.prefersReducedMotion()) {
-        missFlash = Math.max(missFlash, broke ? 0.85 : 0.55);
+        missFlash = Math.max(missFlash, broke ? 0.85 : (near ? 0.42 : 0.55));
         shake = Math.max(shake, broke ? 0.35 : 0.18);
       } else {
         missFlash = Math.max(missFlash, 0.32);
       }
-      markers.push({
-        x: cx, y: cy, life: broke ? 0.55 : 0.42,
-        text: 'ERROU', pts: 0, miss: true, pop: true
-      });
+      if (near) {
+        markers.push({
+          x: cx, y: cy, life: 0.55,
+          text: 'QUASE!', pts: 0, miss: true, pop: true, near: true,
+          tx: near.p.x, ty: near.p.y
+        });
+      } else {
+        markers.push({
+          x: cx, y: cy, life: broke ? 0.55 : 0.42,
+          text: 'ERROU', pts: 0, miss: true, pop: true
+        });
+      }
       if (broke) {
         markers.push({
           x: cx, y: cy - 0.07, life: 0.75,
           text: 'COMBO QUEBRADO', pts: 0, toast: true, miss: true
+        });
+      } else if (hadPerfect >= 2) {
+        markers.push({
+          x: cx, y: cy - 0.07, life: 0.65,
+          text: 'CENTROS ZERADOS', pts: 0, toast: true, miss: true
         });
       }
       if (typeof PoligonoUI !== 'undefined' && PoligonoUI.pulseCombo) {
@@ -654,6 +765,7 @@ const PoligonoGame = (() => {
     const sorted = targets.slice().sort((a, b) => a.lane - b.lane);
     for (const t of sorted) drawTarget(g, t);
 
+    drawUrgencyRings(g);
     drawHitFlash(g);
     drawMissFlash(g);
     drawParticles(g);
@@ -666,11 +778,38 @@ const PoligonoGame = (() => {
     if (!g) return;
     g.clearRect(0, 0, w, h);
     drawSpawnTelegraphs(g);
+    drawUrgencyRings(g);
     drawHitFlash(g);
     drawMissFlash(g);
     drawParticles(g);
     drawMarkers(g);
     if (running && !state.ended) drawCrosshair(g);
+  }
+
+  function drawUrgencyRings(g) {
+    if (!g) return;
+    const reduce = PoligonoInput.prefersReducedMotion();
+    for (const t of targets) {
+      if (t.hit || !t.urgent || t.telegraph > 0) continue;
+      const p = screenOf(t);
+      const x = p.x * w;
+      const y = p.y * h;
+      const base = use3d ? (30 + t.lane * 6) : (t.pixelR || t.r);
+      const k = Math.max(0, Math.min(1, t.life / URGENT_LIFE));
+      const pulse = reduce ? 0.7 : (0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 140)));
+      const ringR = base * (1.25 + (1 - k) * 0.35);
+      g.strokeStyle = 'rgba(212,104,88,' + (0.35 + pulse * 0.45) + ')';
+      g.lineWidth = reduce ? 2 : 2.6;
+      g.beginPath();
+      g.arc(x, y, ringR, 0, Math.PI * 2);
+      g.stroke();
+      /* life arc */
+      g.strokeStyle = 'rgba(255,180,140,' + (0.55 + pulse * 0.35) + ')';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.arc(x, y, ringR + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k);
+      g.stroke();
+    }
   }
 
   function drawSpawnTelegraphs(g) {
@@ -741,14 +880,14 @@ const PoligonoGame = (() => {
         g.save();
         g.translate(m.x * w, m.y * h);
         g.scale(pop, pop);
-        g.fillStyle = m.miss ? '#d46858' : (m.perfect ? '#ffe6a8' : '#e8b86a');
+        g.fillStyle = m.urgent ? '#ffb090' : (m.miss ? '#d46858' : (m.perfect ? '#ffe6a8' : '#e8b86a'));
         g.font = 'bold ' + (m.streak ? 18 : 16) + 'px system-ui, sans-serif';
         g.fillText(m.text, 0, 0);
         g.restore();
         g.globalAlpha = 1;
         continue;
       }
-      g.fillStyle = m.miss ? '#a84838' : '#e8b86a';
+      g.fillStyle = m.near ? '#e8a070' : (m.miss ? '#a84838' : '#e8b86a');
       const popHit = m.pop && !PoligonoInput.prefersReducedMotion()
         ? (1 + Math.max(0, (m.life - 0.4) * 0.9))
         : 1;
@@ -772,6 +911,26 @@ const PoligonoGame = (() => {
         g.beginPath();
         g.moveTo(mx - s, my - s); g.lineTo(mx + s, my + s);
         g.moveTo(mx + s, my - s); g.lineTo(mx - s, my + s);
+        g.stroke();
+      } else if (m.near && m.tx != null) {
+        /* Wave 4: chevron pointing toward the grazed target */
+        const mx = m.x * w, my = m.y * h;
+        const tx = m.tx * w, ty = m.ty * h;
+        const ang = Math.atan2(ty - my, tx - mx);
+        const len = 18;
+        g.strokeStyle = 'rgba(232,160,112,0.9)';
+        g.lineWidth = 2.4;
+        g.beginPath();
+        g.moveTo(mx, my);
+        g.lineTo(mx + Math.cos(ang) * len, my + Math.sin(ang) * len);
+        g.stroke();
+        const ax = mx + Math.cos(ang) * len;
+        const ay = my + Math.sin(ang) * len;
+        g.beginPath();
+        g.moveTo(ax, ay);
+        g.lineTo(ax - Math.cos(ang - 0.45) * 8, ay - Math.sin(ang - 0.45) * 8);
+        g.moveTo(ax, ay);
+        g.lineTo(ax - Math.cos(ang + 0.45) * 8, ay - Math.sin(ang + 0.45) * 8);
         g.stroke();
       }
       g.globalAlpha = 1;
