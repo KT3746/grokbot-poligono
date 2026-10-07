@@ -40,6 +40,11 @@ const PoligonoInput = (() => {
           const fz = document.getElementById('fire-zone');
           if (fz) fz.classList.remove('hidden');
         }
+        /* Wave 5: ignore aim start inside FOGO deadzone (Galaxy one-hand) */
+        if (nearFireZone(e.clientX, e.clientY)) {
+          e.preventDefault();
+          return;
+        }
         if (aimingTouchId === null) {
           aimingTouchId = e.pointerId;
           try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -66,14 +71,31 @@ const PoligonoInput = (() => {
       if (e.pointerId === aimingTouchId) aimingTouchId = null;
     });
 
+    function nearFireZone(cx, cy) {
+      /* Wave 5: palm / FOGO deadzone so aim does not jump onto the thumb button */
+      if (!fireBtn) return false;
+      const fz = document.getElementById('fire-zone');
+      if (!fz || fz.classList.contains('hidden')) return false;
+      const r = fireBtn.getBoundingClientRect();
+      const pad = 22;
+      return cx >= r.left - pad && cx <= r.right + pad
+        && cy >= r.top - pad && cy <= r.bottom + pad;
+    }
+
     if (fireBtn) {
+      const clearPress = () => fireBtn.classList.remove('is-press');
       const fire = (e) => {
         e.preventDefault();
         e.stopPropagation();
+        fireBtn.classList.add('is-press');
         fireQueued = true;
         PoligonoAudio.ensure();
       };
       fireBtn.addEventListener('pointerdown', fire, { passive: false });
+      fireBtn.addEventListener('pointerup', clearPress);
+      fireBtn.addEventListener('pointercancel', clearPress);
+      fireBtn.addEventListener('pointerleave', clearPress);
+      fireBtn.addEventListener('lostpointercapture', clearPress);
       fireBtn.addEventListener('click', (e) => { e.preventDefault(); });
     }
 

@@ -202,7 +202,7 @@ const PoligonoGame = (() => {
     const btn = document.getElementById('btn-fire');
     if (!btn) return;
     btn.classList.toggle('is-ready', !!on);
-    btn.setAttribute('aria-label', on ? 'Disparar — mira no alvo' : 'Disparar');
+    btn.setAttribute('aria-label', on ? 'Disparar: mira no alvo' : 'Disparar');
   }
 
   function kickFireBtn() {
@@ -766,6 +766,7 @@ const PoligonoGame = (() => {
     for (const t of sorted) drawTarget(g, t);
 
     drawUrgencyRings(g);
+    drawTargetChevrons(g);
     drawHitFlash(g);
     drawMissFlash(g);
     drawParticles(g);
@@ -779,6 +780,7 @@ const PoligonoGame = (() => {
     g.clearRect(0, 0, w, h);
     drawSpawnTelegraphs(g);
     drawUrgencyRings(g);
+    drawTargetChevrons(g);
     drawHitFlash(g);
     drawMissFlash(g);
     drawParticles(g);
@@ -831,6 +833,64 @@ const PoligonoGame = (() => {
       g.beginPath();
       g.arc(x, y, base * (0.7 + (1 - k) * 0.35), 0, Math.PI * 2);
       g.fill();
+    }
+  }
+
+
+  function drawTargetChevrons(g) {
+    /* Wave 5: edge / far-aim radar chevrons (Galaxy portrait awareness) */
+    if (!g || warmup > 0 || state.ended) return;
+    const touchUi = document.body.classList.contains('touch-ui');
+    const insetL = 20, insetR = 20;
+    const insetT = 58;
+    const insetB = touchUi ? 118 : 36;
+    const cx = (cross.x + recoil.x) * w;
+    const cy = (cross.y + recoil.y) * h;
+    const farThresh = Math.min(w, h) * 0.30;
+    const reduce = PoligonoInput.prefersReducedMotion();
+    for (const t of targets) {
+      if (t.hit || t.telegraph > 0.12) continue;
+      const p = screenOf(t);
+      const tx = p.x * w, ty = p.y * h;
+      const clampedX = Math.max(insetL, Math.min(w - insetR, tx));
+      const clampedY = Math.max(insetT, Math.min(h - insetB, ty));
+      const off = Math.hypot(tx - clampedX, ty - clampedY) > 1.5;
+      const far = Math.hypot(tx - cx, ty - cy) > farThresh;
+      if (!off && !far) continue;
+      let ax, ay;
+      if (off) {
+        ax = clampedX;
+        ay = clampedY;
+      } else {
+        ax = cx + (tx - cx) * 0.7;
+        ay = cy + (ty - cy) * 0.7;
+        ax = Math.max(insetL, Math.min(w - insetR, ax));
+        ay = Math.max(insetT, Math.min(h - insetB, ay));
+      }
+      const ang = Math.atan2(ty - ay, tx - ax);
+      const pulse = reduce ? 0.75 : (0.55 + 0.4 * Math.abs(Math.sin(performance.now() / 180 + (t.id ? t.id.length : 0))));
+      const col = t.urgent
+        ? ('rgba(255,160,120,' + (0.55 + pulse * 0.4) + ')')
+        : ('rgba(232,184,106,' + (0.45 + pulse * 0.4) + ')');
+      const len = touchUi ? 14 : 11;
+      g.save();
+      g.strokeStyle = col;
+      g.lineWidth = touchUi ? 2.6 : 2.1;
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      const tipX = ax + Math.cos(ang) * len;
+      const tipY = ay + Math.sin(ang) * len;
+      g.beginPath();
+      g.moveTo(ax - Math.cos(ang) * 3, ay - Math.sin(ang) * 3);
+      g.lineTo(tipX, tipY);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(tipX, tipY);
+      g.lineTo(tipX - Math.cos(ang - 0.55) * 8, tipY - Math.sin(ang - 0.55) * 8);
+      g.moveTo(tipX, tipY);
+      g.lineTo(tipX - Math.cos(ang + 0.55) * 8, tipY - Math.sin(ang + 0.55) * 8);
+      g.stroke();
+      g.restore();
     }
   }
 
@@ -1153,7 +1213,15 @@ const PoligonoGame = (() => {
     g.moveTo(cx, cy + gap); g.lineTo(cx, cy + s);
     g.stroke();
 
-    g.strokeStyle = 'rgba(232,184,106,0.95)';
+    /* Wave 5: reticle heat scales with combo streak */
+    const heat = Math.min(1, (state.combo || 0) / 9);
+    const hr = 232 + Math.round(23 * heat);
+    const hg = 184 + Math.round(46 * heat);
+    const hb = 106 + Math.round(62 * heat);
+    const heatStroke = 'rgba(' + hr + ',' + hg + ',' + hb + ',0.95)';
+    const heatDot = 'rgba(' + hr + ',' + hg + ',' + hb + ',0.98)';
+
+    g.strokeStyle = heatStroke;
     g.lineWidth = touchUi ? 2 : 1.5;
     g.beginPath();
     g.moveTo(cx - s, cy); g.lineTo(cx - gap, cy);
@@ -1166,10 +1234,18 @@ const PoligonoGame = (() => {
     g.beginPath();
     g.arc(cx, cy, touchUi ? 3 : 2.4, 0, Math.PI * 2);
     g.fill();
-    g.fillStyle = 'rgba(232,184,106,0.95)';
+    g.fillStyle = heatDot;
     g.beginPath();
     g.arc(cx, cy, touchUi ? 1.9 : 1.5, 0, Math.PI * 2);
     g.fill();
+
+    if (heat > 0.05 && !PoligonoInput.prefersReducedMotion()) {
+      g.strokeStyle = 'rgba(' + hr + ',' + hg + ',' + hb + ',' + (0.2 + heat * 0.35) + ')';
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.arc(cx, cy, ringR + 3 + heat * 4, 0, Math.PI * 2);
+      g.stroke();
+    }
 
     g.strokeStyle = 'rgba(12,10,8,0.4)';
     g.lineWidth = 2;
@@ -1179,7 +1255,7 @@ const PoligonoGame = (() => {
     g.strokeStyle = aimLocked
       ? 'rgba(255,230,168,0.9)'
       : (aiming && touchUi
-        ? 'rgba(232,184,106,0.7)'
+        ? ('rgba(' + hr + ',' + hg + ',' + hb + ',0.72)')
         : 'rgba(196,137,58,0.4)');
     g.lineWidth = touchUi ? 1.4 : 1;
     g.beginPath();

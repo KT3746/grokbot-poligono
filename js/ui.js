@@ -4,6 +4,8 @@ const PoligonoUI = (() => {
   const DAILY_KEY = 'poligono-daily-meta';
   let hintActive = false;
   let hintLeaveTimer = null;
+  let displayScore = 0;
+  let scoreAnim = null;
 
   function $(id) { return document.getElementById(id); }
 
@@ -165,6 +167,11 @@ const PoligonoUI = (() => {
 
   function showPlaying() {
     hideAllScreens();
+    displayScore = 0;
+    if (scoreAnim) { cancelAnimationFrame(scoreAnim); scoreAnim = null; }
+    const se = $('hud-score');
+    if (se) { se.textContent = '0'; se.classList.remove('score-pop'); }
+    setFireComboRing(0);
     show('hud');
     applyFireButton();
     showOnboardingHint();
@@ -188,7 +195,7 @@ const PoligonoUI = (() => {
     const shots = state.shots || 0;
     const hits = state.hits || 0;
     const accNum = shots ? Math.round((hits / shots) * 100) : null;
-    const accLabel = accNum == null ? '—' : (accNum + '%');
+    const accLabel = accNum == null ? '-' : (accNum + '%');
     const bestCombo = state.bestCombo || 0;
 
     $('res-score').textContent = String(state.score);
@@ -251,10 +258,61 @@ const PoligonoUI = (() => {
     }
   }
 
+  function setFireComboRing(combo) {
+    const ring = $('fire-combo');
+    const btn = $('btn-fire');
+    if (!ring) return;
+    const c = Math.max(0, combo || 0);
+    const step = c % 3;
+    const pct = c === 0 ? 0 : (step === 0 ? 1 : step / 3);
+    const deg = Math.round(pct * 360);
+    ring.style.setProperty('--combo', deg + 'deg');
+    ring.style.opacity = c > 0 ? '1' : '0';
+    if (btn) {
+      btn.classList.toggle('has-combo', c >= 3);
+      btn.classList.toggle('combo-full', c > 0 && step === 0);
+    }
+  }
+
+  function tickScoreTo(target) {
+    const scoreEl = $('hud-score');
+    if (!scoreEl) return;
+    const to = Math.max(0, target | 0);
+    if (to === 0 || to < displayScore) {
+      if (scoreAnim) { cancelAnimationFrame(scoreAnim); scoreAnim = null; }
+      displayScore = to;
+      scoreEl.textContent = String(to);
+      scoreEl.classList.remove('score-pop');
+      return;
+    }
+    if (to === displayScore) return;
+    scoreEl.classList.remove('score-pop');
+    void scoreEl.offsetWidth;
+    scoreEl.classList.add('score-pop');
+    const from = displayScore;
+    const start = performance.now();
+    const dur = Math.min(480, 90 + Math.abs(to - from) * 1.8);
+    if (scoreAnim) cancelAnimationFrame(scoreAnim);
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      displayScore = Math.round(from + (to - from) * eased);
+      scoreEl.textContent = String(displayScore);
+      if (t < 1) scoreAnim = requestAnimationFrame(step);
+      else {
+        displayScore = to;
+        scoreEl.textContent = String(to);
+        scoreAnim = null;
+      }
+    };
+    scoreAnim = requestAnimationFrame(step);
+  }
+
   function updateHud(state, mode) {
     const scoreEl = $('hud-score');
     const goalEl = $('hud-goal');
-    scoreEl.textContent = String(state.score);
+    tickScoreTo(state.score);
+    setFireComboRing(state.combo);
     const goalMeter = $('hud-goal-meter');
     const goalFill = $('hud-goal-fill');
     if (mode === 'desafio' && state.goal > 0) {
@@ -273,7 +331,7 @@ const PoligonoUI = (() => {
       if (goalEl) goalEl.classList.add('hidden');
       if (goalMeter) goalMeter.classList.add('hidden');
     }
-    const acc = state.shots ? Math.round((state.hits / state.shots) * 100) + '%' : '—';
+    const acc = state.shots ? Math.round((state.hits / state.shots) * 100) + '%' : '-';
     $('hud-acc').textContent = acc;
 
     // combo streak clearly; multiplier subtle when >1
