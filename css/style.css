@@ -777,3 +777,71 @@ body.touch-ui #game { cursor: none; }
   .fire-recover { transition: none !important; }
   .hud-centros-block .hud-value.centros-hot { text-shadow: none; }
 }
+
+
+/* —— Wave 5: FOGO combo ring, press spring, score ticker, Galaxy deadzone cues —— */
+.fire-combo {
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  background: conic-gradient(
+    from -90deg,
+    rgba(120, 180, 110, 0.9) 0deg,
+    rgba(120, 180, 110, 0.9) var(--combo, 0deg),
+    rgba(20, 16, 12, 0.12) var(--combo, 0deg),
+    rgba(20, 16, 12, 0.12) 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+  transition: opacity 0.14s ease-out;
+}
+.fire-btn.has-combo {
+  box-shadow:
+    0 0 0 4px rgba(120, 180, 110, 0.18),
+    0 0 20px rgba(120, 180, 110, 0.22),
+    0 8px 24px rgba(0, 0, 0, 0.55);
+}
+.fire-btn.combo-full .fire-combo {
+  background: conic-gradient(
+    from -90deg,
+    rgba(255, 230, 168, 0.95) 0deg,
+    rgba(255, 230, 168, 0.95) 360deg
+  );
+  filter: drop-shadow(0 0 6px rgba(255, 230, 168, 0.35));
+}
+.fire-btn.is-press {
+  transform: scale(0.9);
+  filter: brightness(1.08);
+  transition: transform 0.08s ease-out, filter 0.08s ease-out;
+}
+.fire-btn.is-press.is-kick {
+  animation: none;
+}
+
+.hud-score-block .hud-value.score-pop {
+  animation: score-pop 0.36s cubic-bezier(.2, 1.35, .4, 1);
+  color: #ffe6a8;
+}
+@keyframes score-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+/* Extra Galaxy / gesture-nav clearance for FOGO (portrait) */
+@media (max-width: 430px) and (orientation: portrait) {
+  .fire-zone {
+    bottom: calc(18px + var(--safe-b) + 6px);
+    right: calc(14px + var(--safe-r));
+  }
+  .fire-btn { width: 92px; height: 92px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-score-block .hud-value.score-pop { animation: none !important; }
+  .fire-btn.is-press { transform: none; transition: none !important; }
+  .fire-combo { transition: none !important; }
+}
