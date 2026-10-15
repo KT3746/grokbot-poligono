@@ -250,6 +250,34 @@ const PoligonoUI = (() => {
       dailyEl.textContent = formatDailyLine(recorded.meta);
     }
 
+    /* Onda 6: classificação do atirador + cartão de agrupamento */
+    let extra = $('results-onda6');
+    if (!extra) {
+      extra = document.createElement('div');
+      extra.id = 'results-onda6';
+      extra.className = 'res6';
+      const anchor = $('results-daily');
+      anchor.parentNode.insertBefore(extra, anchor);
+    }
+    const accV = accNum == null ? 0 : accNum;
+    const group = state.group || [];
+    const centros = group.filter(g => g.c).length;
+    const rank = !shots ? null
+      : (accV >= 85 && hits >= 12) ? { n: 'Atirador de Elite', k: 'elite', i: '◆◆◆' }
+      : (accV >= 70 && hits >= 8) ? { n: 'Especialista', k: 'esp', i: '◆◆' }
+      : (accV >= 45) ? { n: 'Atirador', k: 'atir', i: '◆' }
+      : { n: 'Recruta', k: 'rec', i: '◇' };
+    const spread = group.length
+      ? Math.sqrt(group.reduce((a, g) => a + g.x * g.x + g.y * g.y, 0) / group.length) : 0;
+    const groupLabel = !group.length ? '' : spread < 0.3 ? 'agrupamento fechado' : spread < 0.55 ? 'agrupamento bom' : 'agrupamento aberto';
+    const S = 92, R = 40;
+    const dots = group.map(g => `<circle cx="${(S / 2 + g.x * R).toFixed(1)}" cy="${(S / 2 + g.y * R).toFixed(1)}" r="2.6" class="${g.c ? 'is-c' : ''}"/>`).join('');
+    extra.innerHTML = (rank ? `<div class="res6-rank is-${rank.k}"><span class="res6-ico">${rank.i}</span><div><small>classificação</small><b>${rank.n}</b></div></div>` : '')
+      + (group.length ? `<div class="res6-group"><svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}" aria-label="Agrupamento dos tiros">`
+        + `<circle cx="46" cy="46" r="${R}" class="ring r1"/><circle cx="46" cy="46" r="${R * 0.6}" class="ring r2"/><circle cx="46" cy="46" r="${R * 0.25}" class="ring r3"/>`
+        + dots + `</svg><div><small>agrupamento</small><b>${groupLabel}</b><span>${centros} no centro${state.doubles ? ' · ' + state.doubles + ' dupla' + (state.doubles > 1 ? 's' : '') : ''}</span></div></div>` : '');
+    extra.hidden = !rank;
+
     const panel = document.querySelector('#screen-results .panel');
     if (panel) {
       panel.classList.remove('results-enter');

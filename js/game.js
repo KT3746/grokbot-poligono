@@ -91,6 +91,7 @@ const PoligonoGame = (() => {
     }
   }
 
+  let lastHitAt = -9;
   function resetStats(m) {
     mode = m;
     state.score = 0;
@@ -104,6 +105,9 @@ const PoligonoGame = (() => {
     state.wave = 1;
     state.perfectStreak = 0;
     state.bestPerfect = 0;
+    state.group = [];
+    state.doubles = 0;
+    lastHitAt = -9;
     fireRecover = 0;
     if (mode === 'desafio') {
       state.timeLeft = 60;
@@ -554,6 +558,23 @@ const PoligonoGame = (() => {
       state.multiplier = 1 + Math.min(4, Math.floor(state.combo / 3)) * 0.5;
       const pts = Math.round(zone.pts * state.multiplier);
       state.score += pts;
+      /* Onda 6: agrupamento (onde a bala entrou no alvo) */
+      try {
+        const pp = use3d && typeof PoligonoScene !== 'undefined' ? PoligonoScene.project(hitT) : { x: hitT.x, y: hitT.y };
+        let vx = (cx - pp.x) * w, vy = (cy - pp.y) * h;
+        const len = Math.hypot(vx, vy) || 1;
+        vx = (vx / len) * distNorm; vy = (vy / len) * distNorm;
+        if (state.group.length < 60) state.group.push({ x: vx, y: vy, c: zone.name === 'centro' });
+      } catch (_) { /* ok */ }
+      /* Onda 6: dupla rápida — dois alvos em menos de 0,7s */
+      const nowT = performance.now() / 1000;
+      const isDouble = nowT - lastHitAt < 0.7;
+      lastHitAt = nowT;
+      if (isDouble) {
+        state.doubles++;
+        state.score += 25;
+        if (PoligonoAudio.haptic) PoligonoAudio.haptic([8, 20, 8, 20, 12]);
+      }
       /* Wave 4: consecutive centers */
       if (zone.name === 'centro') {
         state.perfectStreak++;
@@ -604,6 +625,12 @@ const PoligonoGame = (() => {
             text: '◎ ×' + state.perfectStreak, pts: 0, toast: true, pop: true, perfect: true
           });
         }
+      }
+      if (isDouble) {
+        markers.push({
+          x: cx, y: cy + 0.07, life: 0.8,
+          text: 'DUPLA +25', pts: 0, toast: true, pop: true, streak: true
+        });
       }
       if (state.combo > 1 && state.combo % 3 === 0) {
         markers.push({
