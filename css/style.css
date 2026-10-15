@@ -845,3 +845,20 @@ body.touch-ui #game { cursor: none; }
   .fire-btn.is-press { transform: none; transition: none !important; }
   .fire-combo { transition: none !important; }
 }
+
+/* Onda 6: classificação + agrupamento (sóbrio, estande) */
+.res6 { display: grid; gap: 8px; margin: 10px 0 6px; }
+.res6[hidden] { display: none; }
+.res6-rank, .res6-group { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(200,210,220,.18); background: rgba(10,14,18,.55); text-align: left; }
+.res6 small { display: block; font-size: .66rem; letter-spacing: .14em; text-transform: uppercase; opacity: .6; }
+.res6 b { font-size: 1.02rem; letter-spacing: .02em; }
+.res6 span { display: block; font-size: .78rem; opacity: .75; }
+.res6-ico { font-size: 1.1rem; min-width: 44px; text-align: center; color: #9aa4ae; letter-spacing: 2px; }
+.res6-rank.is-elite .res6-ico, .res6-rank.is-elite b { color: #d9b45a; }
+.res6-rank.is-elite { border-color: rgba(217,180,90,.45); box-shadow: 0 0 18px rgba(217,180,90,.18); }
+.res6-rank.is-esp .res6-ico { color: #c8d0d8; }
+.res6-group svg { flex: none; }
+.res6-group .ring { fill: none; stroke: rgba(220,226,232,.35); stroke-width: 1; }
+.res6-group .ring.r3 { fill: rgba(217,180,90,.12); stroke: rgba(217,180,90,.6); }
+.res6-group circle:not(.ring) { fill: #e6eaee; }
+.res6-group circle.is-c { fill: #d9b45a; }
