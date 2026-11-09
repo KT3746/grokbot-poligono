@@ -862,3 +862,17 @@ body.touch-ui #game { cursor: none; }
 .res6-group .ring.r3 { fill: rgba(217,180,90,.12); stroke: rgba(217,180,90,.6); }
 .res6-group circle:not(.ring) { fill: #e6eaee; }
 .res6-group circle.is-c { fill: #d9b45a; }
+
+
+/* ===== Onda 7: AÇO/SALVO, sessão limpa ===== */
+#results-summary.is-clean { color: #9dffe0; }
+.time-urgent-wrap #hud-time {
+  animation: poli-time-pulse 0.7s ease-in-out infinite;
+}
+@keyframes poli-time-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .time-urgent-wrap #hud-time { animation: none; }
+}

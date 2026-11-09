@@ -25,6 +25,15 @@ Som (mudo), a dica de primeira vez e o **melhor do dia** (precisão / combo) fic
 - **Treino** — sem cronômetro; foque em precisão e combo. Use **Encerrar** no menu de pausa para terminar a sessão e ver o resultado.
 - **Desafio** — 60 segundos, ondas com mais alvos móveis, meta de 1200 pontos.
 
+## Onda 7
+
+- **10 SEGUNDOS!** aviso + vibração nos finais do Desafio
+- **AÇO!** ao acertar alvo de aço
+- **SALVO! +40** ao pegar alvo que está sumindo
+- **Sessão limpa!** no resultado se não errou nenhum tiro
+
+Cache `?v=202611090925`.
+
 ## Técnico
 
 Site estático (HTML/CSS/JS vanilla). Visual do estande em **Three.js** (CDN jsDelivr `three.module.min.js` via import map, boot em módulo). Mira, marcadores e HUD em overlay 2D. Caminhos relativos para GitHub Pages em `/grokbot-poligono/`. Sem IPs licenciados.
