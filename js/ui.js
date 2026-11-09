@@ -216,11 +216,14 @@ const PoligonoUI = (() => {
         summary.textContent = 'Nenhum disparo nesta sessão.';
       } else {
         const bp = state.bestPerfect || 0;
+        const limpa = hits === shots && shots > 0;
         summary.textContent = hits + ' acerto' + (hits === 1 ? '' : 's')
           + ' · precisão ' + accLabel
           + ' · melhor combo ×' + bestCombo
           + (bp >= 2 ? (' · centros ×' + bp) : '')
-          + ' · ' + state.score + ' pts';
+          + ' · ' + state.score + ' pts'
+          + (limpa ? ' · Sessão limpa!' : '');
+        summary.classList.toggle('is-clean', limpa);
       }
     }
 

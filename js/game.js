@@ -36,6 +36,7 @@ const PoligonoGame = (() => {
   let aimLocked = false;
   let aimLockTargetId = null;
   let hintDismissed = false;
+  let finalTenBuzzed = false; /* onda 7 */
   let aimStart = null;
   let fireRecover = 0;     /* wave4: FOGO settle ring after shot */
   const FIRE_RECOVER = 0.26;
@@ -131,6 +132,7 @@ const PoligonoGame = (() => {
     aimLocked = false;
     aimLockTargetId = null;
     hintDismissed = false;
+    finalTenBuzzed = false;
     aimStart = null;
     cross = { x: 0.5, y: 0.45 };
   }
@@ -404,6 +406,15 @@ const PoligonoGame = (() => {
 
     if (mode === 'desafio' && !state.ended && warmup <= 0) {
       state.timeLeft -= dt;
+      /* Onda 7: últimos 10s */
+      if (state.timeLeft <= 10 && state.timeLeft > 0 && !finalTenBuzzed) {
+        finalTenBuzzed = true;
+        if (PoligonoAudio.haptic) PoligonoAudio.haptic([20, 40, 20]);
+        markers.push({
+          x: 0.5, y: 0.18, life: 1.1,
+          text: '10 SEGUNDOS!', pts: 0, toast: true, urgent: true
+        });
+      }
       if (state.timeLeft <= 0) {
         state.timeLeft = 0;
         finish(state.score >= state.goal);
@@ -625,6 +636,21 @@ const PoligonoGame = (() => {
             text: '◎ ×' + state.perfectStreak, pts: 0, toast: true, pop: true, perfect: true
           });
         }
+      }
+      /* Onda 7: AÇO! e SALVO! em alvo urgente */
+      if (hitT.kind === 'steel') {
+        markers.push({
+          x: scr.x, y: scr.y + 0.08, life: 0.75,
+          text: 'AÇO!', pts: 0, toast: true, pop: true, steel: true
+        });
+      }
+      if (hitT.urgent) {
+        state.score += 40;
+        markers.push({
+          x: scr.x, y: scr.y - 0.16, life: 0.9,
+          text: 'SALVO! +40', pts: 0, toast: true, pop: true, urgent: true
+        });
+        if (PoligonoAudio.haptic) PoligonoAudio.haptic([14, 30, 14, 30, 18]);
       }
       if (isDouble) {
         markers.push({
