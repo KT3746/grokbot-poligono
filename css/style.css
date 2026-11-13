@@ -876,3 +876,14 @@ body.touch-ui #game { cursor: none; }
 @media (prefers-reduced-motion: reduce) {
   .time-urgent-wrap #hud-time { animation: none; }
 }
+
+/* ===== Onda 8: meta no meio do Desafio, recorde ===== */
+.wave-banner { white-space: nowrap; }
+.wave-banner.is-goal {
+  border-color: rgba(120, 220, 140, .7);
+  background: rgba(8, 20, 10, .85);
+  box-shadow: 0 8px 28px rgba(0,0,0,.45), 0 0 28px rgba(120, 220, 140, .3);
+}
+.wave-banner.is-goal span { color: #b8f5c4; letter-spacing: .08em; }
+.results-record { margin: -4px 0 12px; font-weight: 700; color: #e8b86a; font-size: .92rem; }
+.results-record.is-new { color: #b8f5c4; }

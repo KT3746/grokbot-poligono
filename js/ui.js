@@ -121,9 +121,40 @@ const PoligonoUI = (() => {
     try { return localStorage.getItem(TIP_KEY) === '1'; } catch (_) { return false; }
   }
 
+  const RECORD_KEY = 'poligono-recorde-desafio-v1';
+  function loadRecord() {
+    try { return Math.max(0, parseInt(localStorage.getItem(RECORD_KEY) || '0', 10) || 0); } catch (_) { return 0; }
+  }
+  function saveRecord(v) {
+    try { localStorage.setItem(RECORD_KEY, String(v)); } catch (_) {}
+  }
+
   function showMode() {
     hideAllScreens();
     show('screen-mode');
+    const desc = document.querySelector('#btn-mode-desafio .mode-desc');
+    if (desc) {
+      const r = loadRecord();
+      desc.textContent = r > 0
+        ? '60s · meta 1200 · seu recorde: ' + r + ' pts'
+        : '60s · bata 1200 pts e siga até o fim';
+    }
+  }
+
+  /* onda 8: meta batida no meio do Desafio */
+  let goalBannerUntil = 0;
+  function goalReached() {
+    const wrap = $('wave-banner');
+    const text = $('wave-banner-text');
+    if (!wrap || !text) return;
+    text.textContent = 'META BATIDA! Siga até o fim';
+    wrap.classList.add('is-goal');
+    wrap.classList.remove('hidden', 'is-out', 'is-in');
+    void wrap.offsetWidth;
+    wrap.classList.add('is-in');
+    goalBannerUntil = performance.now() + 1700;
+    if (waveBannerTimer) clearTimeout(waveBannerTimer);
+    waveBannerTimer = setTimeout(() => hideWaveBanner(false), 1700);
   }
 
   function showPause() {
@@ -185,12 +216,36 @@ const PoligonoUI = (() => {
     hideAllScreens();
     show('screen-results');
     const win = mode === 'desafio' ? state.win : true;
+    const goalAt = state.goalAt;
+    const falta = Math.max(0, (state.goal || 0) - (state.score || 0));
     $('results-eyebrow').textContent = mode === 'desafio'
-      ? (win ? 'meta alcançada' : 'tempo esgotado')
+      ? (win ? (goalAt != null ? 'meta batida aos ' + Math.max(1, Math.round(goalAt)) + 's' : 'meta alcançada') : 'tempo esgotado')
       : 'sessão de treino';
     $('results-title').textContent = mode === 'desafio'
-      ? (win ? 'Desafio concluído' : 'Desafio encerrado')
+      ? (win ? 'Desafio concluído' : 'Faltaram ' + falta + ' pts')
       : 'Treino encerrado';
+    /* onda 8: recorde de pontos do Desafio (salvo no aparelho) */
+    let recEl = $('results-record');
+    if (!recEl) {
+      recEl = document.createElement('p');
+      recEl.id = 'results-record';
+      recEl.className = 'results-record';
+      const sum = $('results-summary');
+      sum.parentNode.insertBefore(recEl, sum.nextSibling);
+    }
+    if (mode === 'desafio') {
+      const prev = loadRecord();
+      const sc = state.score || 0;
+      const isNew = sc > prev;
+      if (isNew) saveRecord(sc);
+      recEl.textContent = isNew
+        ? (prev > 0 ? 'Novo recorde! Antes: ' + prev + ' pts' : 'Primeiro recorde: ' + sc + ' pts')
+        : 'Recorde: ' + prev + ' pts · faltaram ' + (prev - sc + 1) + ' para bater';
+      recEl.classList.toggle('is-new', isNew);
+      recEl.classList.remove('hidden');
+    } else {
+      recEl.classList.add('hidden');
+    }
 
     const shots = state.shots || 0;
     const hits = state.hits || 0;
@@ -429,7 +484,7 @@ const PoligonoUI = (() => {
 
   function hintCopy() {
     return wantsFireButton()
-      ? 'Arraste para mirar · FOGO para disparar'
+      ? 'Arraste o dedo para mover a mira · FOGO dispara'
       : 'Mire com o mouse · clique ou Espaço';
   }
 
@@ -499,6 +554,9 @@ const PoligonoUI = (() => {
     const wrap = $('wave-banner');
     const text = $('wave-banner-text');
     if (!wrap || !text) return;
+    const wait = goalBannerUntil - performance.now();
+    if (wait > 0) { setTimeout(() => showWaveBanner(n), wait + 320); return; }
+    wrap.classList.remove('is-goal');
     text.textContent = 'ONDA ' + n;
     wrap.classList.remove('hidden', 'is-out');
     wrap.classList.remove('is-in');
@@ -578,6 +636,6 @@ const PoligonoUI = (() => {
     pulseAccuracy, pulseCombo,
     showCountdown, hideCountdown,
     showWaveBanner, hideWaveBanner,
-    refreshDailyMeta, loadDaily, recordDaily
+    refreshDailyMeta, loadDaily, recordDaily, goalReached
   };
 })();

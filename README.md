@@ -32,7 +32,14 @@ Som (mudo), a dica de primeira vez e o **melhor do dia** (precisão / combo) fic
 - **SALVO! +40** ao pegar alvo que está sumindo
 - **Sessão limpa!** no resultado se não errou nenhum tiro
 
-Cache `?v=202611090925`.
+## Onda 8
+
+- **Alvos grandes e espalhados**: a câmera enquadra a raia em qualquer tela (antes os alvos ficavam amontoados num pedacinho do meio); raias em degraus e alvos que não nascem encostados
+- **Mira de touchpad no celular**: arraste o dedo em qualquer lugar e a mira anda junto - o dedo não cobre mais o alvo
+- **Desafio vai até o fim**: bater 1200 pts mostra **META BATIDA!** e o tempo segue valendo pontos; ondas apertam pelo tamanho do alvo (máx. 6 na tela)
+- **Recorde do Desafio** salvo no aparelho: aparece no botão do modo e no resultado ("faltaram N para bater"); quem não bate a meta vê quantos pontos faltaram
+
+Cache `?v=202611122330`.
 
 ## Técnico
 
