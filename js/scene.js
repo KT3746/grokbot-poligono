@@ -9,6 +9,19 @@ const PoligonoScene = (() => {
 
   const LANE_Z = [-11.4, -8.1, -5.2];
   const TARGET_Y = 1.34;
+  /* onda 8: enquadra a raia - a largura do corredor na raia do meio enche a tela */
+  const LANE_HALF = 1.62;
+  /* raias em degraus: a de trás um pouco mais alta, a da frente mais baixa (menos alvo tampando alvo) */
+  const LANE_Y = [1.56, 1.3, 1.0];
+  const RAIL_Y = 2.02;
+  const FRAME_HALF = 2.6; // metros visíveis de cada lado na raia do meio
+  function fovFor(aspect) {
+    const dist = Math.abs(camBaseZ0 - LANE_Z[1]);
+    const tanH = FRAME_HALF / dist;
+    const vf = (2 * Math.atan(tanH / Math.max(0.3, aspect)) * 180) / Math.PI;
+    return Math.max(aspect > 1.9 ? 28 : 34, Math.min(62, vf));
+  }
+  const camBaseZ0 = 3.15;
 
   const meshes = new Map();
   const pickables = [];
@@ -410,9 +423,10 @@ const PoligonoScene = (() => {
   function worldOf(t) {
     const lane = Math.max(0, Math.min(2, t.lane | 0));
     const z = LANE_Z[lane];
-    const half = 0.92 + (2 - lane) * 0.28;
+    /* onda 8: alvos ocupam a largura da raia (antes amontoados no meio) */
+    const half = LANE_HALF;
     const x = (t.x - 0.5) * 2 * half;
-    const y = TARGET_Y;
+    const y = LANE_Y[lane];
     return { x, y, z, lane };
   }
 
@@ -441,12 +455,14 @@ const PoligonoScene = (() => {
     root.add(clip);
 
     const wire = new THREE.Mesh(geoWire, new THREE.MeshLambertMaterial({ color: 0x8a9098 }));
-    wire.position.set(0, r + 0.06, 0);
-    wire.scale.y = 0.12;
+    const ly = LANE_Y[Math.max(0, Math.min(2, t.lane | 0))];
+    const wireLen = Math.max(0.12, RAIL_Y - (ly + r + 0.12));
+    wire.position.set(0, r + 0.12 + wireLen / 2, 0);
+    wire.scale.y = wireLen;
     root.add(wire);
 
     const hanger = new THREE.Mesh(geoHanger, new THREE.MeshLambertMaterial({ color: 0x6a7078 }));
-    hanger.position.set(0, r + 0.22, -0.02);
+    hanger.position.set(0, r + 0.12 + wireLen, -0.02);
     root.add(hanger);
 
     scene.add(root);
@@ -614,7 +630,7 @@ const PoligonoScene = (() => {
     renderer.setPixelRatio(pr);
     renderer.setSize(w, h, false);
     camera.aspect = w / Math.max(1, h);
-    camera.fov = mobile ? 62 : 52;
+    camera.fov = fovFor(camera.aspect);
     camera.updateProjectionMatrix();
   }
 

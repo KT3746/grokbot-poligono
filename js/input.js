@@ -23,8 +23,24 @@ const PoligonoInput = (() => {
       aim.active = true;
     }
 
+    /* onda 8: no toque a mira anda como touchpad (arrasta de qualquer lugar),
+       então o dedo não cobre o alvo nem a mira */
+    const TOUCH_SENS = 1.35;
+    let dragFrom = null;
+    function dragAim(cx, cy) {
+      if (!dragFrom) return;
+      const r = rect();
+      aim.x = Math.max(0, Math.min(1, dragFrom.ax + ((cx - dragFrom.cx) / r.width) * TOUCH_SENS));
+      aim.y = Math.max(0, Math.min(1, dragFrom.ay + ((cy - dragFrom.cy) / r.height) * TOUCH_SENS));
+      aim.active = true;
+    }
+
     canvas.addEventListener('pointermove', (e) => {
       if (e.pointerType === 'touch' && aimingTouchId !== null && e.pointerId !== aimingTouchId) return;
+      if (e.pointerType === 'touch' && aimingTouchId === e.pointerId) {
+        dragAim(e.clientX, e.clientY);
+        return;
+      }
       if (e.pointerType === 'mouse' || e.buttons === 0 || aimingTouchId === e.pointerId) {
         setAimFromClient(e.clientX, e.clientY);
       }
@@ -48,7 +64,7 @@ const PoligonoInput = (() => {
         if (aimingTouchId === null) {
           aimingTouchId = e.pointerId;
           try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-          setAimFromClient(e.clientX, e.clientY);
+          dragFrom = { cx: e.clientX, cy: e.clientY, ax: aim.x, ay: aim.y };
         }
         e.preventDefault();
         return;
@@ -64,11 +80,12 @@ const PoligonoInput = (() => {
     canvas.addEventListener('pointerup', (e) => {
       if (e.pointerType === 'touch' && e.pointerId === aimingTouchId) {
         aimingTouchId = null;
+        dragFrom = null;
       }
     });
 
     canvas.addEventListener('pointercancel', (e) => {
-      if (e.pointerId === aimingTouchId) aimingTouchId = null;
+      if (e.pointerId === aimingTouchId) { aimingTouchId = null; dragFrom = null; }
     });
 
     function nearFireZone(cx, cy) {

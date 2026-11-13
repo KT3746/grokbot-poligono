@@ -108,6 +108,7 @@ const PoligonoGame = (() => {
     state.bestPerfect = 0;
     state.group = [];
     state.doubles = 0;
+    state.goalAt = null;
     lastHitAt = -9;
     fireRecover = 0;
     if (mode === 'desafio') {
@@ -321,8 +322,9 @@ const PoligonoGame = (() => {
     const scale = laneScale(lane);
     const mobile = Math.min(w, h) <= 500;
     const base = mobile ? 36 : 28;
-    const pixelR = (base + Math.random() * 18) * scale * (Math.min(w, h) / 400);
-    const sizeWorld = (mobile ? 0.52 : 0.44) * (1.16 - lane * 0.07);
+    const shrink = mode === 'desafio' ? Math.max(0.7, 1 - Math.max(0, state.wave - 3) * 0.04) : 1;
+    const pixelR = (base + Math.random() * 18) * scale * (Math.min(w, h) / 400) * shrink;
+    const sizeWorld = (mobile ? 0.52 : 0.44) * (1.16 - lane * 0.07) * shrink;
     const kind = Math.random() < 0.35 ? 'steel' : 'paper';
     const y = laneY(lane) + (Math.random() * 0.04 - 0.02);
     const x = 0.12 + Math.random() * 0.76;
@@ -343,12 +345,15 @@ const PoligonoGame = (() => {
       urgent: false,
       id: Math.random().toString(36).slice(2)
     };
-    for (const o of targets) {
-      const dx = (o.x - t.x);
-      const dy = (o.y - t.y);
-      if (Math.hypot(dx * w, dy * h) < ((o.pixelR || o.r) + (t.pixelR || t.r)) * 1.4) {
-        t.x = 0.1 + Math.random() * 0.8;
-      }
+    /* onda 8: até 8 tentativas para não nascer encostado em outro alvo da mesma raia */
+    for (let tries = 0; tries < 8; tries++) {
+      const clash = targets.some((o) => {
+        if (o.hit) return false;
+        if (use3d) return o.lane === t.lane && Math.abs(o.x - t.x) * 3.24 < (o.sizeWorld + t.sizeWorld) * 1.15;
+        return Math.hypot((o.x - t.x) * w, (o.y - t.y) * h) < ((o.pixelR || o.r) + (t.pixelR || t.r)) * 1.4;
+      });
+      if (!clash) break;
+      t.x = 0.12 + Math.random() * 0.76;
     }
     targets.push(t);
   }
@@ -423,7 +428,8 @@ const PoligonoGame = (() => {
     }
 
     spawnTimer -= dt;
-    const maxT = mode === 'desafio' ? 5 + Math.min(3, Math.floor(state.wave / 2)) : 4;
+    /* onda 8: o Desafio agora vai até 0s - no máximo 6 alvos (sem paredão), e as ondas apertam pelo tamanho */
+    const maxT = mode === 'desafio' ? 5 + Math.min(1, Math.floor(state.wave / 3)) : 4;
     if (spawnTimer <= 0 && targets.filter(t => !t.hit).length < maxT) {
       spawnTarget(Math.random() < (mode === 'desafio' ? 0.55 : 0.4));
       spawnTimer = mode === 'desafio' ? (1.1 - Math.min(0.5, state.wave * 0.05)) : 1.6;
@@ -482,9 +488,11 @@ const PoligonoGame = (() => {
       else fire();
     }
 
-    if (mode === 'desafio' && state.score >= state.wave * 400) {
+    /* onda 8: depois da meta cada onda pede +800 pts; sem faixa por cima do aviso dos 10s */
+    const waveNeed = state.wave <= 3 ? state.wave * 400 : 1200 + (state.wave - 3) * 800;
+    if (mode === 'desafio' && state.score >= waveNeed) {
       state.wave++;
-      if (typeof PoligonoUI !== 'undefined' && PoligonoUI.showWaveBanner) {
+      if (state.timeLeft > 11.5 && typeof PoligonoUI !== 'undefined' && PoligonoUI.showWaveBanner) {
         PoligonoUI.showWaveBanner(state.wave);
       }
       if (typeof PoligonoAudio !== 'undefined') {
@@ -683,8 +691,13 @@ const PoligonoGame = (() => {
         );
       }
 
-      if (mode === 'desafio' && state.score >= state.goal) {
-        finish(true);
+      /* onda 8: bater a meta não encerra - o Desafio vai até 0s valendo recorde */
+      if (mode === 'desafio' && state.score >= state.goal && state.goalAt == null) {
+        state.goalAt = Math.max(0, 60 - state.timeLeft);
+        state.win = true;
+        if (PoligonoAudio.combo) PoligonoAudio.combo(9);
+        if (PoligonoAudio.haptic) PoligonoAudio.haptic([16, 40, 16, 40, 30]);
+        if (typeof PoligonoUI !== 'undefined' && PoligonoUI.goalReached) PoligonoUI.goalReached();
       }
     } else {
       const broke = state.combo >= 2;
